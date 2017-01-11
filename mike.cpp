@@ -1,13 +1,10 @@
 
-#include "mike.hpp"
-#include "AccelStepper/AccelStepper.cpp"
 #include "Arduino.h"
+#include "AccelStepper/AccelStepper.cpp"
+#include "Bounce2-master/Bounce2.cpp"
+#include "mike.hpp"
 
-//#include <avr/io.h>
-//#include <util/delay.h>
-//TODO: remove TBD
-//void TBD(const char * str){printf("%s\n\0",str);};
-void TBD(const char * str){};
+//void TBD(const char * str){};
 
 
 /*** Global data ************************************************************/
@@ -19,13 +16,20 @@ long CAMERA_TARGET_STOP=0;
 long SLIDE_TARGET_STOP=SLIDER_MAX_POSITION;
 ERROR_T ERR=ERROR_T::NONE;
 char STATIC_MEMORY_ALLOCATION[sizeof(StateFirstAdjust)]; //Largest "state"
+
+Bounce GO_BUTTON;
+Bounce HOME_STOP;
+Bounce END_STOP;
 /****************************************************************************/
 
 /*** Utility functions ******************************************************/
 SWITCH_STATE read_3way(){
-  //digitalRead(
-  TBD("Read switch; for now we just return something");
-  return SWITCH_STATE::PROGRAM_MODE;
+  bool video = digitalRead(VIDEO_MODE_PIN);
+  bool lapse = digitalRead(LAPSE_MODE_PIN);
+  if (video && lapse) { return SWITCH_STATE::INVALID; }
+  else if (video) { return SWITCH_STATE::VIDEO_MODE; }
+  else if (lapse) { return SWITCH_STATE::LAPSE_MODE; }
+  else { return SWITCH_STATE::PROGRAM_MODE; }
 }
 
 long read_camera_pot(){
@@ -155,7 +159,7 @@ SliderFSM::SliderFSM() {
 
 /*** Idle state *************************************************************/
 void StateIdle::run_loop(){
-  TBD("sleep in between idle loop runs");
+  delay(1); //wait 50ms
 }
 
 //Transition to programming state, if the 3-way switch is set to program.
@@ -368,7 +372,7 @@ StateSecondHome::StateSecondHome(SliderFSM* machine) : AbstractState(machine){};
 
 /*** Wait state *************************************************************/
 void StateWait::run_loop(){
-  TBD("sleep in between wait loop runs");
+  delay(1);
 }
 
 void StateWait::go_button(){
@@ -452,24 +456,24 @@ void StateError::run_loop(){
       //software error?  Follow through with software error part:
     case SOFTWARE:
       for (int i = 0; i<3; i++) {
-        TBD("turn on LED pin");
-        TBD("sleep 0.5 seconds");
-        TBD("turn off LED pin");
-        TBD("sleep 0.5 seconds");
+        digitalWrite(ERROR_LED_PIN, HIGH);
+        delay(500);
+        digitalWrite(ERROR_LED_PIN, LOW);
+        delay(500);
       }
       break;
     case CANCEL:
       for (int i = 0; i<2; i++) {
-        TBD("turn on LED pin");
-        TBD("sleep 1 seconds");
-        TBD("turn off LED pin");
-        TBD("sleep 0.5 seconds");
+        digitalWrite(ERROR_LED_PIN, HIGH);
+        delay(1000);
+        digitalWrite(ERROR_LED_PIN, LOW);
+        delay(500);
       }
       break;
     case UNKNOWN:
-      TBD("turn on LED pin");
-      TBD("sleep 1.5 seconds")
-      TBD("turn off LED pin");
+      digitalWrite(ERROR_LED_PIN, HIGH);
+      delay(1500);
+      digitalWrite(ERROR_LED_PIN, LOW);
   }
   #endif
   //if we haven't defined an error pin, just leave this mode.
@@ -495,14 +499,40 @@ StateError::StateError(SliderFSM* machine) : AbstractState(machine){};
 /*** Main *******************************************************************/
 void loop() {
   state_machine.run_loop();
+  //if our button has changed, and is high
+  if (GO_BUTTON.update() && GO_BUTTON.read()) {
+    state_machine.go_button();
+  }
+  if (HOME_STOP.update() && HOME_STOP.read()) {
+    state_machine.home_stop();
+  }
+  if (END_STOP.update() && END_STOP.read()) {
+    state_machine.end_stop();
+  }
 }
 
 void setup() {
+//AccelStepper will set pins as output for us
 SLIDER_MOTOR.setMaxSpeed(SLIDER_MAX_SPEED);
 SLIDER_MOTOR.setAcceleration(SLIDER_MAX_ACCEL);
 CAMERA_MOTOR.setMaxSpeed(CAMERA_MAX_SPEED);
 CAMERA_MOTOR.setAcceleration(CAMERA_MAX_ACCEL);
-TBD("Set up go_button, end_stop, and home_stop as interrupt pins?");
+
+pinMode(GO_PIN, INPUT);
+pinMode(HOME_STOP_PIN, INPUT);
+pinMode(END_STOP_PIN, INPUT);
+GO_BUTTON.attach(GO_PIN);
+HOME_STOP.attach(HOME_STOP_PIN);
+END_STOP.attach(END_STOP_PIN);
+//debounce interval in ms
+GO_BUTTON.interval(20);
+HOME_STOP.interval(20);
+END_STOP.interval(20);
+
+pinMode(SPEED_POT_PIN, INPUT);
+pinMode(CAMERA_POT_PIN, INPUT);
+
+pinMode(ERROR_LED_PIN, OUTPUT);
 }
 
 
