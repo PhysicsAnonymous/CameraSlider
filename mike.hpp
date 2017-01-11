@@ -1,8 +1,10 @@
 #ifndef MIKE_H
 #define MIKE_H
 
-//TODO: #include <AccelStepper.h>
 #include "config.hpp"
+
+//We need size_t defined locally for some reason
+typedef unsigned int size_t;
 
 /****************************************************************************/
 enum STATES {
@@ -46,11 +48,6 @@ class StateExecute;
 
 class SliderFSM;
 /****************************************************************************/
-
-//avr-gcc uses unsigned int
-//typedef unsigned int size_t;
-//while gcc uses long unsigned int.
-typedef long unsigned int size_t;
 
 /****************************************************************************/
 // This class is the abstract base class inherited by our states

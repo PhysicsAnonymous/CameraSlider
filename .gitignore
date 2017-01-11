@@ -2,3 +2,7 @@ a.out
 *.hex
 *.o
 *.elf
+/bin
+/bin/*
+/AccelStepper
+/AccelStepper/*

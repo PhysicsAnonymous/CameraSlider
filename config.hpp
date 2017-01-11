@@ -5,7 +5,7 @@
 //TODO: values for speed and accel and position are rectally derrived.
 
 /*** Slider constants *******************************************************/
-#define SLIDER_STEP_PIN 32
+#define SLIDER_STEP_PIN PD2//32
 #define SLIDER_DIR_PIN 1
 //In Steps/secon
 #define SLIDER_MAX_ACCEL 100.0
@@ -17,6 +17,7 @@
 //okay - but if we're way off that isn't.  This is the maximum steps we can
 //be different from zero and still call it "home"
 #define MAX_REHOME_DIFFERENCE 100
+#define MAX_HOMING_SPEED 100.0
 /****************************************************************************/
 
 /*** Camera constants *******************************************************/

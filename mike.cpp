@@ -1,17 +1,18 @@
 
 #include "mike.hpp"
+#include "AccelStepper/AccelStepper.cpp"
+#include "Arduino.h"
 
 //#include <avr/io.h>
 //#include <util/delay.h>
-//TODO: remove this unneded include
-#include <cstdio>
-void TBD(const char * str){printf("%s\n\0",str);};
-//void TBD(const char * str){};
+//TODO: remove TBD
+//void TBD(const char * str){printf("%s\n\0",str);};
+void TBD(const char * str){};
 
 
 /*** Global data ************************************************************/
-//AccelStepper SLIDER_MOTOR(AccelStepper::DRIVER, SLIDER_STEP_PIN, SLIDER_DIR_PIN);
-//AccelStepper CAMERA_MOTOR(AccelStepper::DRIVER, CAMERA_STEP_PIN, CAMERA_DIR_PIN);
+AccelStepper SLIDER_MOTOR(AccelStepper::DRIVER, SLIDER_STEP_PIN, SLIDER_DIR_PIN);
+AccelStepper CAMERA_MOTOR(AccelStepper::DRIVER, CAMERA_STEP_PIN, CAMERA_DIR_PIN);
 SliderFSM state_machine;
 long CAMERA_TARGET_START=0;
 long CAMERA_TARGET_STOP=0;
@@ -27,13 +28,19 @@ SWITCH_STATE read_3way(){
 }
 
 long read_camera_pot(){
-  TBD("long pos_raw = analogRead(CAMERA_POT_PIN);");
+  long pos_raw = analogRead(CAMERA_POT_PIN);
   //Results are between 0 and 1023, shift it between -528 527, and scale it
   //to our camera min/max position:
   TBD("long target_pos = (pos_raw-512) * (CAMERA_MAX_POSITION/512)");
   TBD("return target_pos;");
   return 0;
 }
+
+long read_speed_pot(){
+  TBD("return analogRead(CAMERA_POT_PIN);");
+  //Results are between 0 and 1023
+}
+
 
 /****************************************************************************/
 
@@ -175,7 +182,7 @@ StateIdle::StateIdle(SliderFSM* machine) : AbstractState(machine){};
 
 /*** First home state *******************************************************/
 void StateFirstHome::run_loop(){
-  TBD("SLIDER_MOTOR.run();");
+  TBD("SLIDER_MOTOR.runSpeed();");
 }
 
 bool StateFirstHome::transition_allowed(STATES new_state){
@@ -187,6 +194,7 @@ void StateFirstHome::enter_state(){
   TBD("CAMERA_MOTOR.enableOutputs();");
   TBD("CAMERA_MOTOR.setCurrentPosition(0);");
   TBD("SLIDER_MOTOR.move(-2147483648);"); //maximum negative distance
+  TBD("SLIDER_MOTOR.setSpeed(MAX_HOMING_SPEED);");
 }
 
 void StateFirstHome::home_stop(){
@@ -326,10 +334,15 @@ void StateSecondHome::enter_state(){
 
 void StateSecondHome::home_stop(){
   //Make sure we stopped close enough to zero:
-  TBD("if (SLIDER_MOTOR.currentPosition() >= MAX_REHOME_DIFFERENCE){");
+  TBD("long pos = SLIDER_MOTOR.currentPosition();");
+  TBD("if (pos >= MAX_REHOME_DIFFERENCE){");
   TBD("  ERR=ERROR_T::UNKNOWN;");
   TBD("  m_machine->change_state(STATES::ERROR); }");
   TBD("else {");
+    //update our targets based on our hitting home this time
+    //(since this time we should have been almost stopped when we hit)
+    TBD("SLIDE_TARGET_STOP-=pos;");
+    TBD("CAMERA_MOTOR.setCurrentPosition(0);");
     m_machine->change_state(STATES::WAIT);
   //}
 }
@@ -374,8 +387,8 @@ StateWait::StateWait(SliderFSM* machine) : AbstractState(machine){};
 
 /*** Execute state **********************************************************/
 void StateExecute::run_loop(){
-  TBD("SLIDER_MOTOR.run();");
-  TBD("CAMERA_MOTOR.run();");
+  TBD("SLIDER_MOTOR.runSpeed();");
+  TBD("CAMERA_MOTOR.runSpeed();");
 }
 
 void StateExecute::go_button(){
@@ -390,7 +403,32 @@ void StateExecute::end_stop(){
 }
 
 void StateExecute::enter_state(){
-  TBD("do speed calculations here!");
+  long raw_speed=read_speed_pot();
+  long range,start;
+  switch (read_3way()) {
+    case VIDEO_MODE:
+      range = VIDEO_TRAVERSAL_TIME_MAX - VIDEO_TRAVERSAL_TIME_MIN;
+      start = VIDEO_TRAVERSAL_TIME_MIN;
+      break;
+    case LAPSE_MODE:
+      range = LAPSE_TRAVERSAL_TIME_MAX - LAPSE_TRAVERSAL_TIME_MIN;
+      start = LAPSE_TRAVERSAL_TIME_MIN;
+      break;
+    default:
+      //we shouldn't be able to get to this state with any other mode:
+      ERR=ERROR_T::SOFTWARE;
+      m_machine->change_state(STATES::ERROR);
+  }
+  float secs = ( float(raw_speed)/1023.0 ) * float(range);
+  secs += start;
+  //Now that we know how long it should take, we can figure out how fast we
+  //should move.
+  //slider steps per second
+  float slider_sps = SLIDE_TARGET_STOP / secs;
+  //camera pan steps per second
+  float camera_sps = abs(CAMERA_TARGET_STOP - CAMERA_TARGET_START);
+  TBD("SLIDER_MOTOR.setSpeed(slider_sps);");
+  TBD("CAMERA_MOTOR.setSpeed(camera_sps);");
 }
 
 bool StateExecute::transition_allowed(STATES new_state){
