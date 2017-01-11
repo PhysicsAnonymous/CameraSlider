@@ -23,6 +23,7 @@ char STATIC_MEMORY_ALLOCATION[sizeof(StateFirstAdjust)]; //Largest "state"
 
 /*** Utility functions ******************************************************/
 SWITCH_STATE read_3way(){
+  //digitalRead(
   TBD("Read switch; for now we just return something");
   return SWITCH_STATE::PROGRAM_MODE;
 }
@@ -31,13 +32,13 @@ long read_camera_pot(){
   long pos_raw = analogRead(CAMERA_POT_PIN);
   //Results are between 0 and 1023, shift it between -528 527, and scale it
   //to our camera min/max position:
-  TBD("long target_pos = (pos_raw-512) * (CAMERA_MAX_POSITION/512)");
-  TBD("return target_pos;");
+  long target_pos = (pos_raw-512) * (CAMERA_MAX_POSITION/512);
+  return target_pos;
   return 0;
 }
 
 long read_speed_pot(){
-  TBD("return analogRead(CAMERA_POT_PIN);");
+  return analogRead(CAMERA_POT_PIN);
   //Results are between 0 and 1023
 }
 
@@ -69,8 +70,8 @@ void* AbstractState::operator new(size_t sz){
 }
 
 void AbstractState::operator delete(void* p){
-  //AbstractState *abptr = (AbstractState*)p;
-  //abptr->~AbstractState();
+  //Technically, we should call the destructor here... but all our destructors
+  //are empty anyway, so we won't bother.
 }
 /****************************************************************************/
 
@@ -171,8 +172,8 @@ bool StateIdle::transition_allowed(STATES new_state){
 };
 
 void StateIdle::enter_state(){
-  TBD("SLIDER_MOTOR.disableOutputs();");
-  TBD("CAMERA_MOTOR.disableOutputs();");
+  SLIDER_MOTOR.disableOutputs();
+  CAMERA_MOTOR.disableOutputs();
 };
 
 STATES StateIdle::get_state_as_enum(){return STATES::IDLE;};
@@ -182,7 +183,7 @@ StateIdle::StateIdle(SliderFSM* machine) : AbstractState(machine){};
 
 /*** First home state *******************************************************/
 void StateFirstHome::run_loop(){
-  TBD("SLIDER_MOTOR.runSpeed();");
+  SLIDER_MOTOR.runSpeed();
 }
 
 bool StateFirstHome::transition_allowed(STATES new_state){
@@ -190,17 +191,17 @@ bool StateFirstHome::transition_allowed(STATES new_state){
 };
 
 void StateFirstHome::enter_state(){
-  TBD("SLIDER_MOTOR.enableOutputs();");
-  TBD("CAMERA_MOTOR.enableOutputs();");
-  TBD("CAMERA_MOTOR.setCurrentPosition(0);");
-  TBD("SLIDER_MOTOR.move(-2147483648);"); //maximum negative distance
-  TBD("SLIDER_MOTOR.setSpeed(MAX_HOMING_SPEED);");
+  SLIDER_MOTOR.enableOutputs();
+  CAMERA_MOTOR.enableOutputs();
+  CAMERA_MOTOR.setCurrentPosition(0);
+  SLIDER_MOTOR.move(-2147483648); //maximum negative distance
+  SLIDER_MOTOR.setSpeed(MAX_HOMING_SPEED);
 }
 
 void StateFirstHome::home_stop(){
-  TBD("SLIDER_MOTOR.setCurrentPosition(0);");
-  TBD("SLIDER_MOTOR.runTo(0);"); //possibly unecessary, blocks until done 
-                                 //(but should already be done when called)
+  SLIDER_MOTOR.setCurrentPosition(0);
+  SLIDER_MOTOR.moveTo(0); //possibly unecessary, blocks until done 
+                          //(but should already be done when called)
   m_machine->change_state(STATES::FIRST_ADJUST);
 }
 
@@ -224,10 +225,10 @@ StateFirstHome::StateFirstHome(SliderFSM* machine) : AbstractState(machine){};
 void StateFirstAdjust::run_loop(){
   if (0 >= m_update_counter){
     long target_pos=read_camera_pot();
-    TBD("CAMERA_MOTOR.moveTo(target_pos);");
+    CAMERA_MOTOR.moveTo(target_pos);
     m_update_counter = TICKS_PER_POT_READ;
   }
-  TBD("CAMERA_MOTOR.run();");
+  CAMERA_MOTOR.run();
 }
 
 bool StateFirstAdjust::transition_allowed(STATES new_state){
@@ -235,12 +236,12 @@ bool StateFirstAdjust::transition_allowed(STATES new_state){
 };
 
 void StateFirstAdjust::enter_state(){
-  TBD("CAMERA_MOTOR.setCurrentPosition(0);");
+  CAMERA_MOTOR.setCurrentPosition(0);
   m_update_counter=0;
 }
 
 void StateFirstAdjust::go_button(){
-  TBD("CAMERA_TARGET_START = CAMERA_MOTOR.currentPosition();");
+  CAMERA_TARGET_START = CAMERA_MOTOR.currentPosition();
   m_machine->change_state(STATES::FIRST_END_MOVE);
 }
 
@@ -254,7 +255,7 @@ StateFirstAdjust::StateFirstAdjust(SliderFSM* machine) :
 
 /*** First end move state ***************************************************/
 void StateFirstEndMove::run_loop(){
-  TBD("SLIDER_MOTOR.run();");
+  SLIDER_MOTOR.run();
 }
 
 bool StateFirstEndMove::transition_allowed(STATES new_state){
@@ -262,7 +263,7 @@ bool StateFirstEndMove::transition_allowed(STATES new_state){
 };
 
 void StateFirstEndMove::enter_state(){
-  TBD("SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);");
+  SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
 }
 
 void StateFirstEndMove::home_stop(){
@@ -272,8 +273,10 @@ void StateFirstEndMove::home_stop(){
 
 void StateFirstEndMove::end_stop(){
   //Oops, we over-shot.  No problem, just stop quickly and update our target:
-  TBD("SLIDE_TARGET_STOP = SLIDER_MOTOR.currentPosition();");
-  TBD("SLIDER_MOTOR.runTo(SLIDE_TARGET_STOP);");
+  SLIDE_TARGET_STOP = SLIDER_MOTOR.currentPosition();
+  SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP); //Go back to the position we just marked,
+                                          //in case we over-shot.  Not sure if
+                                          //this would actually work.
   m_machine->change_state(STATES::SECOND_ADJUST);
 }
 
@@ -292,10 +295,10 @@ StateFirstEndMove::StateFirstEndMove(SliderFSM* machine) : AbstractState(machine
 void StateSecondAdjust::run_loop(){
   if (0 >= m_update_counter){
     long target_pos=read_camera_pot();
-    TBD("CAMERA_MOTOR.moveTo(target_pos);");
+    CAMERA_MOTOR.moveTo(target_pos);
     m_update_counter = TICKS_PER_POT_READ;
   }
-  TBD("CAMERA_MOTOR.run();");
+  CAMERA_MOTOR.run();
 }
 
 bool StateSecondAdjust::transition_allowed(STATES new_state){
@@ -307,7 +310,7 @@ void StateSecondAdjust::enter_state(){
 }
 
 void StateSecondAdjust::go_button(){
-  TBD("CAMERA_TARGET_END = CAMERA_MOTOR.currentPosition();");
+  CAMERA_TARGET_STOP = CAMERA_MOTOR.currentPosition();
   m_machine->change_state(STATES::SECOND_HOME);
 }
 
@@ -321,7 +324,7 @@ StateSecondAdjust::StateSecondAdjust(SliderFSM* machine) :
 
 /*** Second home state ******************************************************/
 void StateSecondHome::run_loop(){
-  TBD("SLIDER_MOTOR.run();");
+  SLIDER_MOTOR.run();
 }
 
 bool StateSecondHome::transition_allowed(STATES new_state){
@@ -329,22 +332,22 @@ bool StateSecondHome::transition_allowed(STATES new_state){
 };
 
 void StateSecondHome::enter_state(){
-  TBD("SLIDER_MOTOR.moveTo(0);");
+  SLIDER_MOTOR.moveTo(0);
 }
 
 void StateSecondHome::home_stop(){
   //Make sure we stopped close enough to zero:
-  TBD("long pos = SLIDER_MOTOR.currentPosition();");
-  TBD("if (pos >= MAX_REHOME_DIFFERENCE){");
-  TBD("  ERR=ERROR_T::UNKNOWN;");
-  TBD("  m_machine->change_state(STATES::ERROR); }");
-  TBD("else {");
+  long pos = SLIDER_MOTOR.currentPosition();
+  if (pos >= MAX_REHOME_DIFFERENCE){
+    ERR=ERROR_T::UNKNOWN;
+    m_machine->change_state(STATES::ERROR); }
+  else {
     //update our targets based on our hitting home this time
     //(since this time we should have been almost stopped when we hit)
-    TBD("SLIDE_TARGET_STOP-=pos;");
-    TBD("CAMERA_MOTOR.setCurrentPosition(0);");
+    SLIDE_TARGET_STOP-=pos;
+    CAMERA_MOTOR.setCurrentPosition(0);
     m_machine->change_state(STATES::WAIT);
-  //}
+  }
 }
 
 void StateSecondHome::end_stop(){
@@ -387,8 +390,8 @@ StateWait::StateWait(SliderFSM* machine) : AbstractState(machine){};
 
 /*** Execute state **********************************************************/
 void StateExecute::run_loop(){
-  TBD("SLIDER_MOTOR.runSpeed();");
-  TBD("CAMERA_MOTOR.runSpeed();");
+  SLIDER_MOTOR.runSpeed();
+  CAMERA_MOTOR.runSpeed();
 }
 
 void StateExecute::go_button(){
@@ -427,8 +430,8 @@ void StateExecute::enter_state(){
   float slider_sps = SLIDE_TARGET_STOP / secs;
   //camera pan steps per second
   float camera_sps = abs(CAMERA_TARGET_STOP - CAMERA_TARGET_START);
-  TBD("SLIDER_MOTOR.setSpeed(slider_sps);");
-  TBD("CAMERA_MOTOR.setSpeed(camera_sps);");
+  SLIDER_MOTOR.setSpeed(slider_sps);
+  CAMERA_MOTOR.setSpeed(camera_sps);
 }
 
 bool StateExecute::transition_allowed(STATES new_state){
@@ -475,8 +478,8 @@ void StateError::run_loop(){
 }
 
 void StateError::enter_state(){
-  TBD("SLIDER_MOTOR.disableOutputs();");
-  TBD("CAMERA_MOTOR.disableOutputs();");
+  SLIDER_MOTOR.disableOutputs();
+  CAMERA_MOTOR.disableOutputs();
 }
 
 bool StateError::transition_allowed(STATES new_state){
@@ -495,61 +498,21 @@ void loop() {
 }
 
 void setup() {
-TBD("SLIDER_MOTOR.setMaxSpeed(SLIDER_MAX_SPEED);");
-TBD("SLIDER_MOTOR.setAcceleration(SLIDER_MAX_ACCEL);");
-TBD("CAMERA_MOTOR.setMaxSpeed(CAMERA_MAX_SPEED);");
-TBD("CAMERA_MOTOR.setAcceleration(CAMERA_MAX_ACCEL);");
+SLIDER_MOTOR.setMaxSpeed(SLIDER_MAX_SPEED);
+SLIDER_MOTOR.setAcceleration(SLIDER_MAX_ACCEL);
+CAMERA_MOTOR.setMaxSpeed(CAMERA_MAX_SPEED);
+CAMERA_MOTOR.setAcceleration(CAMERA_MAX_ACCEL);
 TBD("Set up go_button, end_stop, and home_stop as interrupt pins?");
 }
 
-/*
+
 int main(void){
   setup();
   while(true){
     loop();
   }
   return 0;
-}*/
+}
 
-
-int main(int argc, char** argv) {
-  TBD("Hopefully we've uncommented the motor definitions at the start");
-  setup();
-  loop();
-  loop(); //Idle
-  state_machine.go_button(); //Switch to homing
-  loop();
-  loop();
-  loop();
-  state_machine.home_stop(); //Switch to adjusting
-  loop();
-  loop();
-  loop();
-  state_machine.go_button(); //Switch to move to end
-  loop();
-  loop();
-  loop();
-  state_machine.end_stop(); //switch to adjust 2
-  loop();
-  loop();
-  loop();
-  state_machine.go_button(); //switch to home2
-  loop();
-  loop();
-  loop();
-  state_machine.home_stop(); //switch to waiting
-  loop();
-  loop();
-  loop();
-  state_machine.go_button(); //probably won't work since mode button doesn't work
-  loop();
-  loop();
-  loop();
-  state_machine.end_stop();
-  loop();
-  loop();
-  return 0;
-  
-} 
 /****************************************************************************/
 
