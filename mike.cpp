@@ -512,6 +512,9 @@ void loop() {
 }
 
 void setup() {
+pinMode(ERROR_LED_PIN, OUTPUT);
+digitalWrite(ERROR_LED_PIN, HIGH);
+
 //AccelStepper will set pins as output for us
 SLIDER_MOTOR.setMaxSpeed(SLIDER_MAX_SPEED);
 SLIDER_MOTOR.setAcceleration(SLIDER_MAX_ACCEL);
@@ -532,7 +535,8 @@ END_STOP.interval(20);
 pinMode(SPEED_POT_PIN, INPUT);
 pinMode(CAMERA_POT_PIN, INPUT);
 
-pinMode(ERROR_LED_PIN, OUTPUT);
+delay(900);
+digitalWrite(ERROR_LED_PIN, LOW);
 }
 
 

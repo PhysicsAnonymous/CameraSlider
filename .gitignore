@@ -2,9 +2,11 @@ a.out
 *.hex
 *.o
 *.elf
-/bin
-/bin/*
-/AccelStepper
-/AccelStepper/*
-/Bounce2-master
-/Bounce2-master/*
+bin
+bin/*
+AccelStepper
+AccelStepper/*
+Bounce2-master
+Bounce2-master/*
+build-nano-atmega328
+build-nano-atmega328/*
