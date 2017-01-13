@@ -87,6 +87,7 @@ class AbstractState {
 
     void operator delete(void* p);
 
+  protected:
     void setSoftwareError();
     void setUnknownError();
     void setCancel();
