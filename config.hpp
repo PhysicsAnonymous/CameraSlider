@@ -12,6 +12,8 @@
 //Max possible position is 2,147,483,647.  
 //Can be a function like steps/inch * inches
 #define SLIDER_MAX_POSITION -400 * 32//-860 * 32
+//How many steps to try at a time while backing off
+#define BACK_OFF_STEP SLIDER_MAX_POSITION/1000;
 //If we head to zero, but hit the "home" switch a few ticks early, that's
 //okay - but if we're way off that isn't.  This is the maximum steps we can
 //be different from zero and still call it "home"
@@ -44,6 +46,7 @@
 #define HOME_STOP_PIN 9 //D9
 #define END_STOP_PIN 14 //Nope
 #define GO_PIN 8 //D8
+#define DEBOUNCE_INTERVAL 20 //in us
 /****************************************************************************/
 
 /*** POT constants **********************************************************/

@@ -98,6 +98,24 @@ float calculate_travel_time(){
   return secs;
 }
 
+void back_off_stop(Bounce &stop){
+  long direction = SLIDER_MAX_POSITION/SLIDER_MAX_POSITION;
+  if(&END_STOP == &stop){
+    direction*=-1;
+  }
+  digitalWrite(ERROR_LED_PIN, HIGH);
+  long distance=max(SLIDER_MAX_POSITION/2000,10) * direction;
+  while (stop.update() && !stop.read()){
+    SLIDER_MOTOR.move(distance);
+    while(0 != SLIDER_MOTOR.distanceToGo()){
+      SLIDER_MOTOR.run();
+    }
+    //wait to ensure there's no button bounce
+    delay(min(DEBOUNCE_INTERVAL/100,1));
+  }
+  digitalWrite(ERROR_LED_PIN, LOW);
+}
+
 
 /****************************************************************************/
 
@@ -270,9 +288,8 @@ void StateFirstHome::enter_state(){
 }
 
 void StateFirstHome::home_stop(){
+  back_off_stop(HOME_STOP);
   SLIDER_MOTOR.setCurrentPosition(0);
-  SLIDER_MOTOR.moveTo(0); //possibly unecessary, blocks until done 
-                          //(but should already be done when called)
   m_machine->change_state(STATES::FIRST_ADJUST);
 }
 
@@ -348,6 +365,7 @@ void StateFirstEndMove::home_stop(){
 
 void StateFirstEndMove::end_stop(){
   //Oops, we over-shot.  No problem, just stop quickly and update our target:
+  back_off_stop(END_STOP);
   SLIDE_TARGET_STOP = SLIDER_MOTOR.currentPosition();
   SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
   SLIDER_MOTOR.runToPosition(); //Go back to the position we just marked,
@@ -419,6 +437,7 @@ void StateSecondHome::enter_state(){
 
 void StateSecondHome::home_stop(){
   //Make sure we stopped close enough to zero:
+  back_off_stop(HOME_STOP);
   long pos = SLIDER_MOTOR.currentPosition();
   if (pos > MAX_REHOME_DIFFERENCE){
     ERR=ERROR_T::UNKNOWN;
@@ -486,6 +505,7 @@ void StateExecute::go_button(){
 }
 
 void StateExecute::end_stop(){
+  back_off_stop(END_STOP);
   //All done, even if we didn't quite hit our targets
   m_machine->change_state(STATES::REPEAT_WAIT);
 }
@@ -580,6 +600,7 @@ void StateReverseExecute::go_button(){
 
 void StateReverseExecute::home_stop(){
   //All done, even if we didn't quite hit our targets
+    back_off_stop(HOME_STOP);
   m_machine->change_state(STATES::REPEAT_WAIT);
 }
 
@@ -718,9 +739,9 @@ GO_BUTTON.attach(GO_PIN);
 HOME_STOP.attach(HOME_STOP_PIN);
 END_STOP.attach(END_STOP_PIN);
 //debounce interval in ms
-GO_BUTTON.interval(20);
-HOME_STOP.interval(20);
-END_STOP.interval(20);
+GO_BUTTON.interval(DEBOUNCE_INTERVAL);
+HOME_STOP.interval(DEBOUNCE_INTERVAL);
+END_STOP.interval(DEBOUNCE_INTERVAL);
 
 pinMode(SPEED_POT_PIN, INPUT);
 pinMode(CAMERA_POT_PIN, INPUT);
