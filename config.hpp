@@ -1,8 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
-//TODO: Not sure which of these are motor1 and motor2 in the drawing, so 
-//      guesses used below.
-//TODO: values for speed and accel and position are rectally derrived.
+
+#define DEBUG_OUTPUT
 
 /*** Slider constants *******************************************************/
 #define SLIDER_STEP_PIN 2 //D2
@@ -52,6 +51,8 @@
 #define CAMERA_POT_PIN 2 //A2
 //Adjust this if the camera pan is too slow to adjust to the adjuster pot
 #define TICKS_PER_POT_READ 1000
+#define REVERSE_SPEED_POT
+//#define REVERSE_CAMERA_POT
 /****************************************************************************/
 
 /*** Error LED constants ****************************************************/

@@ -18,6 +18,8 @@ enum STATES {
   WAIT,
   EXECUTE,
   ERROR,
+  REPEAT_WAIT,
+  REVERSE_EXECUTE,
   MAX_STATES
 };
 
@@ -232,6 +234,34 @@ class StateExecute : public AbstractState {
   protected:
     friend SliderFSM; //Only let the state machine construct us
     StateExecute(SliderFSM* machine);
+};
+/****************************************************************************/
+
+/*** Repeat Wait state ******************************************************/
+class StateRepeatWait : public AbstractState {
+  public:
+    virtual void run_loop();
+    virtual void go_button();
+    virtual bool transition_allowed(STATES new_state);
+    virtual STATES get_state_as_enum();
+  protected:
+    friend SliderFSM; //Only let the state machine construct us
+    StateRepeatWait(SliderFSM* machine);
+};
+/****************************************************************************/
+
+/*** Reverse Execute state **************************************************/
+class StateReverseExecute : public AbstractState {
+  public:
+    virtual void run_loop();
+    virtual void go_button();
+    virtual void home_stop();
+    virtual bool transition_allowed(STATES new_state);
+    virtual void enter_state();
+    virtual STATES get_state_as_enum();
+  protected:
+    friend SliderFSM; //Only let the state machine construct us
+    StateReverseExecute(SliderFSM* machine);
 };
 /****************************************************************************/
 

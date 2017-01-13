@@ -20,6 +20,8 @@ char STATIC_MEMORY_ALLOCATION[sizeof(StateFirstAdjust)]; //Largest "state"
 Bounce GO_BUTTON;
 Bounce HOME_STOP;
 Bounce END_STOP;
+
+STATES REPEAT_TOGGLE=STATES::REVERSE_EXECUTE;
 /****************************************************************************/
 
 /*** Utility functions ******************************************************/
@@ -35,11 +37,12 @@ long de_jitter(const long value){
 SWITCH_STATE read_3way(){
   bool video = !digitalRead(VIDEO_MODE_PIN);
   bool lapse = !digitalRead(LAPSE_MODE_PIN);
-  //TODO: remove these debug lines
-  Serial.print("video switch: ");
-  Serial.print(video);
-  Serial.print(" lapse switch: ");
-  Serial.println(lapse);
+  #ifdef DEBUG_OUTPUT
+    Serial.print("video switch: ");
+    Serial.print(video);
+    Serial.print(" lapse switch: ");
+    Serial.println(lapse);
+  #endif //DEBUG_OUTPUT
   if (video && lapse) { return SWITCH_STATE::INVALID; }
   else if (video) { return SWITCH_STATE::VIDEO_MODE; }
   else if (lapse) { return SWITCH_STATE::LAPSE_MODE; }
@@ -48,6 +51,13 @@ SWITCH_STATE read_3way(){
 
 long read_camera_pot(){
   long pos_raw = analogRead(CAMERA_POT_PIN);
+  #ifdef REVERSE_CAMERA_POT
+  pos_raw = 1023 - pos_raw;
+  #endif // REVERSE_CAMERA_POT
+  #ifdef DEBUG_OUTPUT
+    Serial.print("raw camera pot");
+    Serial.println(pos_raw);
+  #endif //DEBUG_OUTPUT
   //make sure there was a real change, so we aren't going back and forth
   //between two very close values.
   pos_raw = de_jitter(pos_raw);
@@ -57,9 +67,35 @@ long read_camera_pot(){
   return target_pos;
 }
 
-long read_speed_pot(){
-  return de_jitter(analogRead(CAMERA_POT_PIN));
-  //Results are between 0 and 1023
+float calculate_travel_time(){
+  long raw_speed=analogRead(SPEED_POT_PIN);
+  #ifdef REVERSE_SPEED_POT
+    raw_speed = 1023 - raw_speed;
+  #endif //REVERSE_SPEED_POT
+  #ifdef DEBUG_OUTPUT
+    Serial.print("raw speed pot");
+    Serial.println(raw_speed);
+  #endif //DEBUG_OUTPUT
+  long range,start;
+  //Get the range (from 5 seconds to 30 seconds has a 25 second range)
+  //and then scale it by the value of the slider (2.5v out of 5v would
+  //be half, 12.5s.)  Then add it to the start (5s) for the  total
+  //traversal time (17.5s in this case.)
+  switch (read_3way()) {
+    case VIDEO_MODE:
+      range = VIDEO_TRAVERSAL_TIME_MAX - VIDEO_TRAVERSAL_TIME_MIN;
+      start = VIDEO_TRAVERSAL_TIME_MIN;
+      break;
+    case LAPSE_MODE:
+      range = LAPSE_TRAVERSAL_TIME_MAX - LAPSE_TRAVERSAL_TIME_MIN;
+      start = LAPSE_TRAVERSAL_TIME_MIN;
+      break;
+    default:
+      return 0.0;
+  }
+  float secs = ( float(raw_speed)/1023.0 ) * float(range);
+  secs += start;
+  return secs;
 }
 
 
@@ -162,6 +198,12 @@ void SliderFSM::update_state(){
     case ERROR:
       m_state = new StateError(this);
       break;
+    case REVERSE_EXECUTE:
+      m_state = new StateReverseExecute(this);
+      break;
+    case REPEAT_WAIT:
+      m_state = new StateRepeatWait(this);
+      break;
     default:
       ERR=ERROR_T::SOFTWARE;
       m_state = new StateError(this);
@@ -208,6 +250,7 @@ StateIdle::StateIdle(SliderFSM* machine) : AbstractState(machine){};
 /*** First home state *******************************************************/
 void StateFirstHome::run_loop(){
   SLIDER_MOTOR.runSpeed();
+  CAMERA_MOTOR.run();
 }
 
 bool StateFirstHome::transition_allowed(STATES new_state){
@@ -217,7 +260,11 @@ bool StateFirstHome::transition_allowed(STATES new_state){
 void StateFirstHome::enter_state(){
   SLIDER_MOTOR.enableOutputs();
   CAMERA_MOTOR.enableOutputs();
-  CAMERA_MOTOR.setCurrentPosition(0);
+  if (!CAMERA_TARGET_START && !CAMERA_TARGET_STOP) {
+    //If this is our first run, assume we are pointing the right way
+      CAMERA_MOTOR.setCurrentPosition(0);
+  }
+  CAMERA_MOTOR.moveTo(0);
   SLIDER_MOTOR.move(-2147483648); //maximum negative distance
   SLIDER_MOTOR.setSpeed(MAX_HOMING_SPEED);
 }
@@ -428,7 +475,7 @@ void StateExecute::run_loop(){
   CAMERA_MOTOR.runSpeedToPosition();
   if (0 == SLIDER_MOTOR.distanceToGo() &&
       0 == CAMERA_MOTOR.distanceToGo()){
-    m_machine->change_state(STATES::IDLE); //All done!
+    m_machine->change_state(STATES::REPEAT_WAIT); //All done!
   }
 }
 
@@ -440,73 +487,146 @@ void StateExecute::go_button(){
 
 void StateExecute::end_stop(){
   //All done, even if we didn't quite hit our targets
-  m_machine->change_state(STATES::IDLE);
+  m_machine->change_state(STATES::REPEAT_WAIT);
 }
 
 void StateExecute::enter_state(){
-  long raw_speed=read_speed_pot();
-  long range,start;
-  //Get the range (from 5 seconds to 30 seconds has a 25 second range)
-  //and then scale it by the value of the slider (2.5v out of 5v would
-  //be half, 12.5s.)  Then add it to the start (5s) for the  total
-  //traversal time (17.5s in this case.)
-  switch (read_3way()) {
-    case VIDEO_MODE:
-      range = VIDEO_TRAVERSAL_TIME_MAX - VIDEO_TRAVERSAL_TIME_MIN;
-      start = VIDEO_TRAVERSAL_TIME_MIN;
-      break;
-    case LAPSE_MODE:
-      range = LAPSE_TRAVERSAL_TIME_MAX - LAPSE_TRAVERSAL_TIME_MIN;
-      start = LAPSE_TRAVERSAL_TIME_MIN;
-      break;
-    default:
-      //we shouldn't be able to get to this state with any other mode:
-      ERR=ERROR_T::SOFTWARE;
-      start=0;//just so this isn't left uninitialized!
-      range=0;
-      m_machine->change_state(STATES::ERROR);
+  REPEAT_TOGGLE=STATES::REVERSE_EXECUTE; //Next time, reverse excute if we go again.
+  long secs = calculate_travel_time();
+  if (0.0 == secs) {
+    //Okay to use 0 comparison in float; we set this as an error condition
+    //rather than calculating it.
+    ERR=ERROR_T::SOFTWARE;
+    m_machine->change_state(STATES::ERROR);
   }
-  float secs = ( float(raw_speed)/1023.0 ) * float(range);
-  secs += start;
-  //Now that we know how long it should take, we can figure out how fast we
-  //should move.
-  //slider steps per second
-  float slider_sps = SLIDE_TARGET_STOP / secs;
-  //camera pan steps per second
-  float camera_sps = (CAMERA_TARGET_STOP - CAMERA_TARGET_START) / secs;
-  SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
-  SLIDER_MOTOR.setSpeed(slider_sps);
-  CAMERA_MOTOR.moveTo(CAMERA_TARGET_STOP);
-  CAMERA_MOTOR.setSpeed(camera_sps);
-  //TODO: debug, remove this serial code
-  Serial.print("raw speed: ");
-  Serial.println(raw_speed);
-  Serial.print("range: ");
-  Serial.println(range);
-  Serial.print("start: ");
-  Serial.println(start);
-  Serial.print("secs: ");
-  Serial.println(secs);
-  Serial.print("slider speed: ");
-  Serial.println(slider_sps);
-  Serial.print("camera speed: ");
-  Serial.println(camera_sps);
-  Serial.print("camera position: ");
-  Serial.println(CAMERA_MOTOR.currentPosition());
-  Serial.print("camera start: ");
-  Serial.println(CAMERA_TARGET_START);
-  Serial.print("camera end: ");
-  Serial.println(CAMERA_TARGET_STOP);
-  //TODO: end debug
+  else {
+    //Now that we know how long it should take, we can figure out how fast we
+    //should move.
+    //slider steps per second
+    float slider_sps = SLIDE_TARGET_STOP / secs;
+    //camera pan steps per second
+    float camera_sps = (CAMERA_TARGET_STOP - CAMERA_TARGET_START) / secs;
+    SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
+    SLIDER_MOTOR.setSpeed(slider_sps);
+    CAMERA_MOTOR.moveTo(CAMERA_TARGET_STOP);
+    CAMERA_MOTOR.setSpeed(camera_sps);
+    #ifdef DEBUG_OUTPUT
+      Serial.print("secs: ");
+      Serial.println(secs);
+      Serial.print("slider speed: ");
+      Serial.println(slider_sps);
+      Serial.print("camera speed: ");
+      Serial.println(camera_sps);
+      Serial.print("camera position: ");
+      Serial.println(CAMERA_MOTOR.currentPosition());
+      Serial.print("camera start: ");
+      Serial.println(CAMERA_TARGET_START);
+      Serial.print("camera end: ");
+      Serial.println(CAMERA_TARGET_STOP);
+    #endif //DEBUG_OUTPUT
+  }
 }
 
 bool StateExecute::transition_allowed(STATES new_state){
-  return STATES::IDLE == new_state;
+  return STATES::REPEAT_WAIT == new_state;
 };
 
 STATES StateExecute::get_state_as_enum(){return STATES::EXECUTE;};
 
 StateExecute::StateExecute(SliderFSM* machine) : AbstractState(machine){};
+/****************************************************************************/
+
+/*** RepeatWait state *******************************************************/
+void StateRepeatWait::run_loop(){
+  delay(1);
+}
+
+void StateRepeatWait::go_button(){
+  if (SWITCH_STATE::PROGRAM_MODE != read_3way()){
+    m_machine->change_state(REPEAT_TOGGLE);
+  }
+  else {
+    //Otherwise, re-home and start again.
+    m_machine->change_state(STATES::FIRST_HOME);
+  }
+}
+
+bool StateRepeatWait::transition_allowed(STATES new_state){
+  return STATES::FIRST_HOME == new_state || 
+         STATES::REVERSE_EXECUTE == new_state || 
+         STATES::EXECUTE == new_state;
+};
+
+STATES StateRepeatWait::get_state_as_enum(){return STATES::REPEAT_WAIT;};
+
+StateRepeatWait::StateRepeatWait(SliderFSM* machine) : AbstractState(machine){};
+/****************************************************************************/
+
+/*** ReverseExecute state ***************************************************/
+void StateReverseExecute::run_loop(){
+  SLIDER_MOTOR.runSpeedToPosition();
+  CAMERA_MOTOR.runSpeedToPosition();
+  if (0 == SLIDER_MOTOR.distanceToGo() &&
+      0 == CAMERA_MOTOR.distanceToGo()){
+    m_machine->change_state(STATES::REPEAT_WAIT); //All done!
+  }
+}
+
+void StateReverseExecute::go_button(){
+  //Treat "go" as emergency stop.
+  ERR=ERROR_T::CANCEL;
+  m_machine->change_state(STATES::ERROR);
+}
+
+void StateReverseExecute::home_stop(){
+  //All done, even if we didn't quite hit our targets
+  m_machine->change_state(STATES::REPEAT_WAIT);
+}
+
+void StateReverseExecute::enter_state(){
+  REPEAT_TOGGLE=STATES::EXECUTE;//next time, execute if we repeat
+  long secs = calculate_travel_time();
+  if (0.0 == secs) {
+    //Okay to use 0 comparison in float; we set this as an error condition
+    //rather than calculating it.
+    ERR=ERROR_T::SOFTWARE;
+    m_machine->change_state(STATES::ERROR);
+  }
+  else {
+    //Now that we know how long it should take, we can figure out how fast we
+    //should move.
+    //slider steps per second, negative this time because we are going back
+    float slider_sps = -SLIDE_TARGET_STOP / secs;
+    //camera pan steps per second (reversed because we are going back)
+    float camera_sps = (CAMERA_TARGET_START - CAMERA_TARGET_STOP) / secs;
+    SLIDER_MOTOR.moveTo(0);
+    SLIDER_MOTOR.setSpeed(slider_sps);
+    CAMERA_MOTOR.moveTo(CAMERA_TARGET_START);
+    CAMERA_MOTOR.setSpeed(camera_sps);
+    #ifdef DEBUG_OUTPUT
+      Serial.print("secs: ");
+      Serial.println(secs);
+      Serial.print("slider speed: ");
+      Serial.println(slider_sps);
+      Serial.print("camera speed: ");
+      Serial.println(camera_sps);
+      Serial.print("camera position: ");
+      Serial.println(CAMERA_MOTOR.currentPosition());
+      Serial.print("camera start: ");
+      Serial.println(CAMERA_TARGET_START);
+      Serial.print("camera end: ");
+      Serial.println(CAMERA_TARGET_STOP);
+    #endif //DEBUG_OUTPUT
+  }
+}
+
+bool StateReverseExecute::transition_allowed(STATES new_state){
+  return STATES::REPEAT_WAIT == new_state;
+};
+
+STATES StateReverseExecute::get_state_as_enum(){return STATES::REVERSE_EXECUTE;};
+
+StateReverseExecute::StateReverseExecute(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
 /*** Error state **********************************************************/
@@ -574,9 +694,13 @@ void loop() {
 }
 
 void setup() {
-//TODO: debug; remove serial
-Serial.begin(9600);
+//turn the light on while we boot (even though it will probably be off
+//before humans can see it.)
 pinMode(ERROR_LED_PIN, OUTPUT);
+
+#ifdef DEBUG_OUTPUT
+  Serial.begin(9600);
+#endif
 digitalWrite(ERROR_LED_PIN, HIGH);
 
 //AccelStepper will set pins as output for us
@@ -601,7 +725,6 @@ END_STOP.interval(20);
 pinMode(SPEED_POT_PIN, INPUT);
 pinMode(CAMERA_POT_PIN, INPUT);
 
-delay(900);
 digitalWrite(ERROR_LED_PIN, LOW);
 }
 
