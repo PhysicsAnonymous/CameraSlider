@@ -38,7 +38,7 @@ enum ERROR_T{
 };
 /****************************************************************************/
 
-/*** Class declarations for the states **************************************/
+/*** Class declarations for the states **************************************
 class StateIdle;
 class StateFirstHome;
 class StateFirstAdjust;
@@ -46,7 +46,7 @@ class StateFirstEndMove;
 class StateSecondAdjust;
 class StateSecondHome;
 class StateWait;
-class StateExecute;
+class StateExecute;*/
 
 class SliderFSM;
 /****************************************************************************/
@@ -59,26 +59,26 @@ class AbstractState {
 
     //State classes override this function to be called at regular intervals
     //in the main loop.  (default to nothing)
-    virtual void run_loop();
+    virtual void run_loop()=0;
 
     //Action to take in this state when the red "go" or "set" button is pressed
     //(default to no ignore)
-    virtual void go_button();
+    virtual void go_button()=0;
 
     //Action to take when the "home" stop is activated (default to ignore)
-    virtual void home_stop();
+    virtual void home_stop()=0;
 
     //Action to take when the "end" stop is activated (default to ignore)
-    virtual void end_stop();
+    virtual void end_stop()=0;
 
     //By default, allow all transitions
-    virtual bool transition_allowed(STATES new_state);
+    virtual bool transition_allowed(STATES new_state)=0;
 
     //actions to take when exiting this state (cleanup, etc.)
-    virtual void exit_state();
+    virtual void exit_state()=0;
 
     //actions to take when entering this state
-    virtual void enter_state();
+    virtual void enter_state()=0;
 
     //Just returns the enum associated with the current state
     virtual STATES get_state_as_enum()=0;
@@ -87,13 +87,58 @@ class AbstractState {
 
     void operator delete(void* p);
 
+//  protected:
+//    SliderFSM* m_machine; 
+//    //Protected constructor to prevent accidental instantiation of abstract
+//    AbstractState(SliderFSM* machine) : m_machine(machine) {};
+};
+
+/****************************************************************************/
+// This class is the abstract base class inherited by our states
+template <STATES state>
+class ConcreteState : public AbstractState {
+  public:
+    virtual ~ConcreteState(){};
+
+//State classes override this function to be called at regular intervals
+    //in the main loop.  (default to nothing)
+    virtual void run_loop(){};
+
+    //Action to take in this state when the red "go" or "set" button is pressed
+    //(default to no ignore)
+    virtual void go_button(){};
+
+    //Action to take when the "home" stop is activated (default to ignore)
+    virtual void home_stop(){};
+
+    //Action to take when the "end" stop is activated (default to ignore)
+    virtual void end_stop(){};
+
+    //By default, allow all transitions
+    virtual bool transition_allowed(STATES new_state);
+
+    //actions to take when exiting this state (cleanup, etc.)
+    virtual void exit_state(){};
+
+    //actions to take when entering this state
+    virtual void enter_state(){};
+
+    //Just returns the enum associated with the current state
+    virtual STATES get_state_as_enum(){return state;};
+
+    void* operator new(size_t sz);
+
+    void operator delete(void* p);
+
   protected:
     SliderFSM* m_machine; 
     //Protected constructor to prevent accidental instantiation of abstract
-    AbstractState(SliderFSM* machine) : m_machine(machine) {};
+    ConcreteState(SliderFSM* machine) : m_machine(machine) {};
+    friend SliderFSM;
 };
 /****************************************************************************/
 
+typedef ConcreteState<STATES::IDLE> StateIdle;
 
 /****************************************************************************/
 // Create a Finite State Machine
@@ -112,7 +157,7 @@ class SliderFSM {
 };
 /****************************************************************************/
 
-/*** Idle state *************************************************************/
+/*** Idle state *************************************************************
 class StateIdle : public AbstractState {
   public:
     virtual void run_loop();
@@ -126,7 +171,7 @@ class StateIdle : public AbstractState {
 };
 /****************************************************************************/
 
-/*** First home state *******************************************************/
+/*** First home state *******************************************************
 class StateFirstHome : public AbstractState {
   public:
     virtual void run_loop();
@@ -143,7 +188,7 @@ class StateFirstHome : public AbstractState {
 };
 /****************************************************************************/
 
-/*** First adjust state *******************************************************/
+/*** First adjust state *******************************************************
 class StateFirstAdjust : public AbstractState {
   public:
     virtual void run_loop();
@@ -159,7 +204,7 @@ class StateFirstAdjust : public AbstractState {
 };
 /****************************************************************************/
 
-/*** First end move state ***************************************************/
+/*** First end move state ***************************************************
 class StateFirstEndMove : public AbstractState {
   public:
     virtual void run_loop();
@@ -176,7 +221,7 @@ class StateFirstEndMove : public AbstractState {
 };
 /****************************************************************************/
 
-/*** Second adjust state *******************************************************/
+/*** Second adjust state *******************************************************
 class StateSecondAdjust : public AbstractState {
   public:
     virtual void run_loop();
@@ -192,7 +237,7 @@ class StateSecondAdjust : public AbstractState {
 };
 /****************************************************************************/
 
-/*** Second home state ******************************************************/
+/*** Second home state ******************************************************
 class StateSecondHome : public AbstractState {
   public:
     virtual void run_loop();
@@ -209,7 +254,7 @@ class StateSecondHome : public AbstractState {
 };
 /****************************************************************************/
 
-/*** Wait state *************************************************************/
+/*** Wait state *************************************************************
 class StateWait : public AbstractState {
   public:
     virtual void run_loop();
@@ -222,7 +267,7 @@ class StateWait : public AbstractState {
 };
 /****************************************************************************/
 
-/*** Execute state **********************************************************/
+/*** Execute state **********************************************************
 class StateExecute : public AbstractState {
   public:
     virtual void run_loop();
@@ -237,7 +282,7 @@ class StateExecute : public AbstractState {
 };
 /****************************************************************************/
 
-/*** Repeat Wait state ******************************************************/
+/*** Repeat Wait state ******************************************************
 class StateRepeatWait : public AbstractState {
   public:
     virtual void run_loop();
@@ -250,7 +295,7 @@ class StateRepeatWait : public AbstractState {
 };
 /****************************************************************************/
 
-/*** Reverse Execute state **************************************************/
+/*** Reverse Execute state **************************************************
 class StateReverseExecute : public AbstractState {
   public:
     virtual void run_loop();
@@ -265,7 +310,7 @@ class StateReverseExecute : public AbstractState {
 };
 /****************************************************************************/
 
-/*** Error state ************************************************************/
+/*** Error state ************************************************************
 class StateError : public AbstractState {
   public:
     virtual void run_loop();

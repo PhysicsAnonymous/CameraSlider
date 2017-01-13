@@ -15,7 +15,7 @@ long CAMERA_TARGET_START=0;
 long CAMERA_TARGET_STOP=0;
 long SLIDE_TARGET_STOP=SLIDER_MAX_POSITION;
 ERROR_T ERR=ERROR_T::NONE;
-char STATIC_MEMORY_ALLOCATION[sizeof(StateFirstAdjust)]; //Largest "state"
+char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::FIRST_ADJUST>)]; //Largest "state"
 
 Bounce GO_BUTTON;
 Bounce HOME_STOP;
@@ -119,34 +119,47 @@ void back_off_stop(Bounce &stop){
 
 /****************************************************************************/
 
-/*** AbstractState **********************************************************/
+/*** AbstractState **********************************************************
 AbstractState::~AbstractState(){}
 
-void AbstractState::run_loop(){}
+//template<>
+ConcreteState<>::~ConcreteState(){}
 
-void AbstractState::go_button(){}
+template<STATES state>
+void ConcreteState::run_loop(){}
+template<>
+void ConcreteState::go_button(){}
 
-void AbstractState::home_stop(){}
+template<>
+void ConcreteState::home_stop(){}
 
-void AbstractState::end_stop(){}
+template<>
+void ConcreteState::end_stop(){}
 
-bool AbstractState::transition_allowed(STATES new_state){return true;}
+//bool AbstractState::transition_allowed(STATES new_state){return true;}
 
-void AbstractState::exit_state(){}
+template<>
+void ConcreteState::exit_state(){}
 
-void AbstractState::enter_state(){}
+template<>
+void ConcreteState::enter_state(){}
 
 //STATES AbstractState::get_state_as_enum(){}
 
-
-void* AbstractState::operator new(size_t sz){
+template<>
+void* ConcreteState::operator new(size_t sz){
   return (void*)STATIC_MEMORY_ALLOCATION;
 }
 
-void AbstractState::operator delete(void* p){
+template<>
+void ConcreteState::operator delete(void* p){
   //Technically, we should call the destructor here... but all our destructors
   //are empty anyway, so we won't bother.
 }
+*/
+void* AbstractState::operator new(size_t sz){
+  return (void*)STATIC_MEMORY_ALLOCATION;
+};
 /****************************************************************************/
 
 
@@ -190,7 +203,7 @@ void SliderFSM::update_state(){
   delete m_state;
   switch (m_target_state) {
     case IDLE: 
-      m_state = new  StateIdle(this);
+      m_state = new  StateIdle(this);/*
       break;
     case FIRST_HOME:
       m_state = new StateFirstHome(this);
@@ -224,7 +237,7 @@ void SliderFSM::update_state(){
       break;
     default:
       ERR=ERROR_T::SOFTWARE;
-      m_state = new StateError(this);
+      m_state = new StateError(this);*/
   }
   m_target_state=STATES::NO_STATE;
   m_state->enter_state();
@@ -238,34 +251,34 @@ SliderFSM::SliderFSM() {
 /****************************************************************************/
 
 /*** Idle state *************************************************************/
+template<>
 void StateIdle::run_loop(){
-  delay(1); //wait 50ms
+  delay(1);
 }
 
-//Transition to programming state, if the 3-way switch is set to program.
+template<>
 void StateIdle::go_button(){
   if (SWITCH_STATE::PROGRAM_MODE == read_3way()){
+    //Transition to programming state, if the 3-way switch is set to program.
     m_machine->change_state(STATES::FIRST_HOME);
   }
   //else, wrong mode and ignore spurrious button push
 }
 
-//Only allow transitions to the First Home state from here
-bool StateIdle::transition_allowed(STATES new_state){
-  return STATES::FIRST_HOME == new_state;
-};
+//template<>
+//void StateIdle::transition_allowed(STATES new_state){
+//  return STATES::FIRST_HOME == new_state;
+//};
 
+template<>
 void StateIdle::enter_state(){
   SLIDER_MOTOR.disableOutputs();
   CAMERA_MOTOR.disableOutputs();
 };
 
-STATES StateIdle::get_state_as_enum(){return STATES::IDLE;};
-
-StateIdle::StateIdle(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** First home state *******************************************************/
+/*** First home state *******************************************************
 void StateFirstHome::run_loop(){
   SLIDER_MOTOR.runSpeed();
   CAMERA_MOTOR.run();
@@ -309,7 +322,7 @@ STATES StateFirstHome::get_state_as_enum(){return STATES::FIRST_HOME;};
 StateFirstHome::StateFirstHome(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** First adjust state *******************************************************/
+/*** First adjust state *******************************************************
 void StateFirstAdjust::run_loop(){
   if (0 >= m_update_counter){
     long target_pos=read_camera_pot();
@@ -342,7 +355,7 @@ StateFirstAdjust::StateFirstAdjust(SliderFSM* machine) :
 {};
 /****************************************************************************/
 
-/*** First end move state ***************************************************/
+/*** First end move state ***************************************************
 void StateFirstEndMove::run_loop(){
   SLIDER_MOTOR.run();
   if (0 == SLIDER_MOTOR.distanceToGo()){
@@ -385,7 +398,7 @@ STATES StateFirstEndMove::get_state_as_enum(){return STATES::FIRST_END_MOVE;};
 StateFirstEndMove::StateFirstEndMove(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Second adjust state ****************************************************/
+/*** Second adjust state ****************************************************
 void StateSecondAdjust::run_loop(){
   if (0 >= m_update_counter){
     long target_pos=read_camera_pot();
@@ -417,7 +430,7 @@ StateSecondAdjust::StateSecondAdjust(SliderFSM* machine) :
 {};
 /****************************************************************************/
 
-/*** Second home state ******************************************************/
+/*** Second home state ******************************************************
 void StateSecondHome::run_loop(){
   SLIDER_MOTOR.run();
   CAMERA_MOTOR.run();
@@ -467,7 +480,7 @@ STATES StateSecondHome::get_state_as_enum(){return STATES::SECOND_HOME;};
 StateSecondHome::StateSecondHome(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Wait state *************************************************************/
+/*** Wait state *************************************************************
 void StateWait::run_loop(){
   delay(1);
 }
@@ -488,7 +501,7 @@ STATES StateWait::get_state_as_enum(){return STATES::WAIT;};
 StateWait::StateWait(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Execute state **********************************************************/
+/*** Execute state **********************************************************
 void StateExecute::run_loop(){
   SLIDER_MOTOR.runSpeedToPosition();
   CAMERA_MOTOR.runSpeedToPosition();
@@ -556,7 +569,7 @@ STATES StateExecute::get_state_as_enum(){return STATES::EXECUTE;};
 StateExecute::StateExecute(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** RepeatWait state *******************************************************/
+/*** RepeatWait state *******************************************************
 void StateRepeatWait::run_loop(){
   delay(1);
 }
@@ -582,7 +595,7 @@ STATES StateRepeatWait::get_state_as_enum(){return STATES::REPEAT_WAIT;};
 StateRepeatWait::StateRepeatWait(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** ReverseExecute state ***************************************************/
+/*** ReverseExecute state ***************************************************
 void StateReverseExecute::run_loop(){
   SLIDER_MOTOR.runSpeedToPosition();
   CAMERA_MOTOR.runSpeedToPosition();
@@ -650,7 +663,7 @@ STATES StateReverseExecute::get_state_as_enum(){return STATES::REVERSE_EXECUTE;}
 StateReverseExecute::StateReverseExecute(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Error state **********************************************************/
+/*** Error state **********************************************************
 void StateError::run_loop(){
   #ifdef ERROR_LED_PIN
   switch (ERR) {
