@@ -333,15 +333,13 @@ void StateFirstHome::home_stop(){
 
 template<>
 void StateFirstHome::end_stop(){
-  ERR=ERROR_T::SOFTWARE;
-  m_machine->change_state(STATES::ERROR);
+  setSoftwareError();
 }
 
 template<>
 void StateFirstHome::go_button(){
   //The "go" button is now "stop."  Like pressing the "start menu" to shut down.
-  ERR=ERROR_T::CANCEL;
-  m_machine->change_state(STATES::ERROR);
+  setCancel();
 }
 /****************************************************************************/
 
@@ -397,8 +395,7 @@ void StateFirstEndMove::enter_state(){
 
 template<>
 void StateFirstEndMove::home_stop(){
-  ERR=ERROR_T::SOFTWARE;
-  m_machine->change_state(STATES::ERROR);
+  setSoftwareError();
 }
 
 template<>
@@ -416,8 +413,7 @@ void StateFirstEndMove::end_stop(){
 template<>
 void StateFirstEndMove::go_button(){
   //The "go" button is now "stop."  Like pressing the "start menu" to shut down.
-  ERR=ERROR_T::CANCEL;
-  m_machine->change_state(STATES::ERROR);
+  setCancel();
 }
 /****************************************************************************/
 
@@ -487,15 +483,13 @@ void StateSecondHome::home_stop(){
 
 template<>
 void StateSecondHome::end_stop(){
-  ERR=ERROR_T::SOFTWARE;
-  m_machine->change_state(STATES::ERROR);
+  setSoftwareError();
 }
 
 template<>
 void StateSecondHome::go_button(){
   //The "go" button is now "stop."  Like pressing the "start menu" to shut down.
-  ERR=ERROR_T::CANCEL;
-  m_machine->change_state(STATES::ERROR);
+  setCancel();
 }
 /****************************************************************************/
 
@@ -534,8 +528,7 @@ void StateExecute::run_loop(){
 template<>
 void StateExecute::go_button(){
   //Treat "go" as emergency stop.
-  ERR=ERROR_T::CANCEL;
-  m_machine->change_state(STATES::ERROR);
+  setCancel();
 }
 
 template<>
@@ -552,8 +545,7 @@ void StateExecute::enter_state(){
   if (0.0 == secs) {
     //Okay to use 0 comparison in float; we set this as an error condition
     //rather than calculating it.
-    ERR=ERROR_T::SOFTWARE;
-    m_machine->change_state(STATES::ERROR);
+    setSoftwareError();
   }
   else {
     //Now that we know how long it should take, we can figure out how fast we
@@ -628,8 +620,7 @@ void StateReverseExecute::run_loop(){
 template<>
 void StateReverseExecute::go_button(){
   //Treat "go" as emergency stop.
-  ERR=ERROR_T::CANCEL;
-  m_machine->change_state(STATES::ERROR);
+  setCancel();
 }
 
 template<>
@@ -646,8 +637,7 @@ void StateReverseExecute::enter_state(){
   if (0.0 == secs) {
     //Okay to use 0 comparison in float; we set this as an error condition
     //rather than calculating it.
-    ERR=ERROR_T::SOFTWARE;
-    m_machine->change_state(STATES::ERROR);
+    setSoftwareError();
   }
   else {
     //Now that we know how long it should take, we can figure out how fast we
