@@ -55,7 +55,7 @@ class SliderFSM;
 // This class is the abstract base class inherited by our states
 class AbstractState {
   public:
-    virtual ~AbstractState();
+    virtual ~AbstractState(){};
 
     //State classes override this function to be called at regular intervals
     //in the main loop.  (default to nothing)
@@ -115,7 +115,7 @@ class ConcreteState : public AbstractState {
     virtual void end_stop(){};
 
     //By default, allow all transitions
-    virtual bool transition_allowed(STATES new_state);
+    virtual bool transition_allowed(STATES new_state){return false;};
 
     //actions to take when exiting this state (cleanup, etc.)
     virtual void exit_state(){};
@@ -126,9 +126,9 @@ class ConcreteState : public AbstractState {
     //Just returns the enum associated with the current state
     virtual STATES get_state_as_enum(){return state;};
 
-    void* operator new(size_t sz);
+    //void* operator new(size_t sz);
 
-    void operator delete(void* p);
+    //void operator delete(void* p);
 
   protected:
     SliderFSM* m_machine; 

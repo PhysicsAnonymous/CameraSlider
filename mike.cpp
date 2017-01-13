@@ -160,6 +160,13 @@ void ConcreteState::operator delete(void* p){
 void* AbstractState::operator new(size_t sz){
   return (void*)STATIC_MEMORY_ALLOCATION;
 };
+
+void AbstractState::operator delete(void* p){
+  //Technically, we should call the destructor here... but all our destructors
+  //are empty anyway, so we won't bother.
+}
+
+//bool ConcreteState::transition_allowed(STATES new_state){return false;}
 /****************************************************************************/
 
 
