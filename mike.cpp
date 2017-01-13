@@ -105,7 +105,7 @@ float calculate_travel_time(){
 }
 
 void back_off_stop(Bounce &stop){
-  long direction = SLIDER_MAX_POSITION/SLIDER_MAX_POSITION;
+  long direction = HOMEWARD;
   if(&END_STOP == &stop){
     direction*=-1;
   }
@@ -113,6 +113,7 @@ void back_off_stop(Bounce &stop){
   long distance=max(SLIDER_MAX_POSITION/2000,10) * direction;
   while (stop.update() && !stop.read()){
     SLIDER_MOTOR.move(distance);
+    DEBUG(F("backing off stop (steps): "),distance);
     while(0 != SLIDER_MOTOR.distanceToGo()){
       SLIDER_MOTOR.run();
     }
@@ -120,10 +121,6 @@ void back_off_stop(Bounce &stop){
     delay(min(DEBOUNCE_INTERVAL/100,1));
   }
   digitalWrite(ERROR_LED_PIN, LOW);
-}
-
-bool have_camera_targets(){
-  return CAMERA_TARGET_START || CAMERA_TARGET_STOP;
 }
 
 /****************************************************************************/
