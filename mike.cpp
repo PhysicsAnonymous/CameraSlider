@@ -250,11 +250,6 @@ SliderFSM::SliderFSM() {
 
 /*** Wait state *************************************************************/
 template<>
-void StateWait::run_loop(){
-  delay(1);
-}
-
-template<>
 void StateWait::go_button(){
   if (SWITCH_STATE::PROGRAM_MODE == read_3way()){
     //If we are in programming mode and execute, we go home no matter what
@@ -593,20 +588,33 @@ bool StateError::transition_allowed(STATES new_state){
 
 /*** Main *******************************************************************/
 void loop() {
+  static int counter = 0;
+  #define COUNTER_MAX 30
+  #define COUNTER_STEP COUNTER_MAX / 3
   state_machine.run_loop();
-  //if our button has changed, and is high
-  if (GO_BUTTON.update() && !GO_BUTTON.read()) {
-    DEBUG(F("Go button pressed"));
-    state_machine.go_button();
+  if(COUNTER_STEP == counter){
+    //if our button has changed, and is high
+    if (GO_BUTTON.update() && !GO_BUTTON.read()) {
+      DEBUG(F("Go button pressed"));
+      state_machine.go_button();
+    }
   }
-  if (HOME_STOP.update() && !HOME_STOP.read()) {
-    DEBUG(F("Home stop hit"));
-    state_machine.home_stop();
+  if(COUNTER_STEP * 2 == counter){
+    if (HOME_STOP.update() && !HOME_STOP.read()) {
+      DEBUG(F("Home stop hit"));
+      state_machine.home_stop();
+    }
   }
-  if (END_STOP.update() && !END_STOP.read()) {
-    DEBUG(F("End stop hit"));
-    state_machine.end_stop();
+  if(0 == counter){
+    if (END_STOP.update() && !END_STOP.read()) {
+      DEBUG(F("End stop hit"));
+      state_machine.end_stop();
+    }
+    counter = COUNTER_MAX; //loops until button check
   }
+  counter--;
+  #undef COUNTER_MAX
+  #undef COUNTER_STEP
 }
 
 void setup() {
