@@ -285,16 +285,19 @@ void StateIdle::enter_state(){
 
 /****************************************************************************/
 
-/*** First home state *******************************************************
+/*** First home state *******************************************************/
+template<>
 void StateFirstHome::run_loop(){
   SLIDER_MOTOR.runSpeed();
   CAMERA_MOTOR.run();
 }
 
+template<>
 bool StateFirstHome::transition_allowed(STATES new_state){
   return new_state == STATES::FIRST_ADJUST;
 };
 
+template<>
 void StateFirstHome::enter_state(){
   SLIDER_MOTOR.enableOutputs();
   CAMERA_MOTOR.enableOutputs();
@@ -307,62 +310,60 @@ void StateFirstHome::enter_state(){
   SLIDER_MOTOR.setSpeed(MAX_HOMING_SPEED);
 }
 
+template<>
 void StateFirstHome::home_stop(){
   back_off_stop(HOME_STOP);
   SLIDER_MOTOR.setCurrentPosition(0);
   m_machine->change_state(STATES::FIRST_ADJUST);
 }
 
+template<>
 void StateFirstHome::end_stop(){
   ERR=ERROR_T::SOFTWARE;
   m_machine->change_state(STATES::ERROR);
 }
 
+template<>
 void StateFirstHome::go_button(){
   //The "go" button is now "stop."  Like pressing the "start menu" to shut down.
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
 }
-
-STATES StateFirstHome::get_state_as_enum(){return STATES::FIRST_HOME;};
-
-StateFirstHome::StateFirstHome(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** First adjust state *******************************************************
+/*** First adjust state *****************************************************/
+template<>
 void StateFirstAdjust::run_loop(){
-  if (0 >= m_update_counter){
+  //Only read the pot every TICKS_PER_POT_READ, because Analog read is slow.
+  static int counter = 0;
+  if (0 >= counter){
     long target_pos=read_camera_pot();
     CAMERA_MOTOR.moveTo(target_pos);
-    m_update_counter = TICKS_PER_POT_READ;
+    counter = TICKS_PER_POT_READ;
   }
   CAMERA_MOTOR.run();
-  m_update_counter--;
+  counter--;
 }
 
+template<>
 bool StateFirstAdjust::transition_allowed(STATES new_state){
   return new_state == STATES::FIRST_END_MOVE;
 };
 
+template<>
 void StateFirstAdjust::enter_state(){
   CAMERA_MOTOR.setCurrentPosition(0);
-  m_update_counter=0;
 }
 
+template<>
 void StateFirstAdjust::go_button(){
   CAMERA_TARGET_START = CAMERA_MOTOR.currentPosition();
   m_machine->change_state(STATES::FIRST_END_MOVE);
 }
-
-STATES StateFirstAdjust::get_state_as_enum(){return STATES::FIRST_ADJUST;};
-
-StateFirstAdjust::StateFirstAdjust(SliderFSM* machine) : 
-                                           AbstractState(machine),
-                                           m_update_counter(0) 
-{};
 /****************************************************************************/
 
-/*** First end move state ***************************************************
+/*** First end move state ***************************************************/
+template<>
 void StateFirstEndMove::run_loop(){
   SLIDER_MOTOR.run();
   if (0 == SLIDER_MOTOR.distanceToGo()){
@@ -370,19 +371,23 @@ void StateFirstEndMove::run_loop(){
   }
 }
 
+template<>
 bool StateFirstEndMove::transition_allowed(STATES new_state){
   return new_state == STATES::SECOND_ADJUST;
 };
 
+template<>
 void StateFirstEndMove::enter_state(){
   SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
 }
 
+template<>
 void StateFirstEndMove::home_stop(){
   ERR=ERROR_T::SOFTWARE;
   m_machine->change_state(STATES::ERROR);
 }
 
+template<>
 void StateFirstEndMove::end_stop(){
   //Oops, we over-shot.  No problem, just stop quickly and update our target:
   back_off_stop(END_STOP);
@@ -394,50 +399,42 @@ void StateFirstEndMove::end_stop(){
   m_machine->change_state(STATES::SECOND_ADJUST);
 }
 
+template<>
 void StateFirstEndMove::go_button(){
   //The "go" button is now "stop."  Like pressing the "start menu" to shut down.
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
 }
-
-STATES StateFirstEndMove::get_state_as_enum(){return STATES::FIRST_END_MOVE;};
-
-StateFirstEndMove::StateFirstEndMove(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Second adjust state ****************************************************
+/*** Second adjust state ****************************************************/
+template<>
 void StateSecondAdjust::run_loop(){
-  if (0 >= m_update_counter){
+  //Only read the pot every TICKS_PER_POT_READ, because Analog read is slow.
+  static int counter = 0;
+  if (0 >= counter){
     long target_pos=read_camera_pot();
     CAMERA_MOTOR.moveTo(target_pos);
-    m_update_counter = TICKS_PER_POT_READ;
+    counter = TICKS_PER_POT_READ;
   }
   CAMERA_MOTOR.run();
-  m_update_counter--;
+  counter--;
 }
 
+template<>
 bool StateSecondAdjust::transition_allowed(STATES new_state){
   return new_state == STATES::SECOND_HOME;
 };
 
-void StateSecondAdjust::enter_state(){
-  m_update_counter=0;
-}
-
+template<>
 void StateSecondAdjust::go_button(){
   CAMERA_TARGET_STOP = CAMERA_MOTOR.currentPosition();
   m_machine->change_state(STATES::SECOND_HOME);
 }
-
-STATES StateSecondAdjust::get_state_as_enum(){return STATES::SECOND_ADJUST;};
-
-StateSecondAdjust::StateSecondAdjust(SliderFSM* machine) : 
-                                           AbstractState(machine),
-                                           m_update_counter(0) 
-{};
 /****************************************************************************/
 
-/*** Second home state ******************************************************
+/*** Second home state ******************************************************/
+template<>
 void StateSecondHome::run_loop(){
   SLIDER_MOTOR.run();
   CAMERA_MOTOR.run();
@@ -446,15 +443,18 @@ void StateSecondHome::run_loop(){
   }
 }
 
+template<>
 bool StateSecondHome::transition_allowed(STATES new_state){
   return new_state == STATES::WAIT;
 };
 
+template<>
 void StateSecondHome::enter_state(){
   SLIDER_MOTOR.moveTo(0);
   CAMERA_MOTOR.moveTo(CAMERA_TARGET_START);
 }
 
+template<>
 void StateSecondHome::home_stop(){
   //Make sure we stopped close enough to zero:
   back_off_stop(HOME_STOP);
@@ -471,27 +471,27 @@ void StateSecondHome::home_stop(){
   }
 }
 
+template<>
 void StateSecondHome::end_stop(){
   ERR=ERROR_T::SOFTWARE;
   m_machine->change_state(STATES::ERROR);
 }
 
+template<>
 void StateSecondHome::go_button(){
   //The "go" button is now "stop."  Like pressing the "start menu" to shut down.
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
 }
-
-STATES StateSecondHome::get_state_as_enum(){return STATES::SECOND_HOME;};
-
-StateSecondHome::StateSecondHome(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Wait state *************************************************************
+/*** Wait state *************************************************************/
+template<>
 void StateWait::run_loop(){
   delay(1);
 }
 
+template<>
 void StateWait::go_button(){
   if (SWITCH_STATE::PROGRAM_MODE != read_3way()){
     m_machine->change_state(STATES::EXECUTE);
@@ -499,16 +499,15 @@ void StateWait::go_button(){
   //If we haven't chosen video or lapse mode, ignore the execute and wait.
 }
 
+template<>
 bool StateWait::transition_allowed(STATES new_state){
   return STATES::EXECUTE == new_state;
 };
 
-STATES StateWait::get_state_as_enum(){return STATES::WAIT;};
-
-StateWait::StateWait(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Execute state **********************************************************
+/*** Execute state **********************************************************/
+template<>
 void StateExecute::run_loop(){
   SLIDER_MOTOR.runSpeedToPosition();
   CAMERA_MOTOR.runSpeedToPosition();
@@ -518,18 +517,21 @@ void StateExecute::run_loop(){
   }
 }
 
+template<>
 void StateExecute::go_button(){
   //Treat "go" as emergency stop.
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
 }
 
+template<>
 void StateExecute::end_stop(){
   back_off_stop(END_STOP);
   //All done, even if we didn't quite hit our targets
   m_machine->change_state(STATES::REPEAT_WAIT);
 }
 
+template<>
 void StateExecute::enter_state(){
   REPEAT_TOGGLE=STATES::REVERSE_EXECUTE; //Next time, reverse excute if we go again.
   long secs = calculate_travel_time();
@@ -567,20 +569,19 @@ void StateExecute::enter_state(){
   }
 }
 
+template<>
 bool StateExecute::transition_allowed(STATES new_state){
   return STATES::REPEAT_WAIT == new_state;
 };
-
-STATES StateExecute::get_state_as_enum(){return STATES::EXECUTE;};
-
-StateExecute::StateExecute(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** RepeatWait state *******************************************************
+/*** RepeatWait state *******************************************************/
+template<>
 void StateRepeatWait::run_loop(){
   delay(1);
 }
 
+template<>
 void StateRepeatWait::go_button(){
   if (SWITCH_STATE::PROGRAM_MODE != read_3way()){
     m_machine->change_state(REPEAT_TOGGLE);
@@ -591,18 +592,16 @@ void StateRepeatWait::go_button(){
   }
 }
 
+template<>
 bool StateRepeatWait::transition_allowed(STATES new_state){
   return STATES::FIRST_HOME == new_state || 
          STATES::REVERSE_EXECUTE == new_state || 
          STATES::EXECUTE == new_state;
 };
-
-STATES StateRepeatWait::get_state_as_enum(){return STATES::REPEAT_WAIT;};
-
-StateRepeatWait::StateRepeatWait(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** ReverseExecute state ***************************************************
+/*** ReverseExecute state ***************************************************/
+template<>
 void StateReverseExecute::run_loop(){
   SLIDER_MOTOR.runSpeedToPosition();
   CAMERA_MOTOR.runSpeedToPosition();
@@ -612,18 +611,21 @@ void StateReverseExecute::run_loop(){
   }
 }
 
+template<>
 void StateReverseExecute::go_button(){
   //Treat "go" as emergency stop.
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
 }
 
+template<>
 void StateReverseExecute::home_stop(){
   //All done, even if we didn't quite hit our targets
     back_off_stop(HOME_STOP);
   m_machine->change_state(STATES::REPEAT_WAIT);
 }
 
+template<>
 void StateReverseExecute::enter_state(){
   REPEAT_TOGGLE=STATES::EXECUTE;//next time, execute if we repeat
   long secs = calculate_travel_time();
@@ -661,16 +663,14 @@ void StateReverseExecute::enter_state(){
   }
 }
 
+template<>
 bool StateReverseExecute::transition_allowed(STATES new_state){
   return STATES::REPEAT_WAIT == new_state;
 };
-
-STATES StateReverseExecute::get_state_as_enum(){return STATES::REVERSE_EXECUTE;};
-
-StateReverseExecute::StateReverseExecute(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
-/*** Error state **********************************************************
+/*** Error state ************************************************************/
+template<>
 void StateError::run_loop(){
   #ifdef ERROR_LED_PIN
   switch (ERR) {
@@ -704,18 +704,16 @@ void StateError::run_loop(){
   m_machine->change_state(STATES::IDLE);
 }
 
+template<>
 void StateError::enter_state(){
   SLIDER_MOTOR.disableOutputs();
   CAMERA_MOTOR.disableOutputs();
 }
 
+template<>
 bool StateError::transition_allowed(STATES new_state){
   return STATES::IDLE == new_state;
 };
-
-STATES StateError::get_state_as_enum(){return STATES::ERROR;};
-
-StateError::StateError(SliderFSM* machine) : AbstractState(machine){};
 /****************************************************************************/
 
 
