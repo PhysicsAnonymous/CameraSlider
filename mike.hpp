@@ -87,10 +87,6 @@ class AbstractState {
 
     void operator delete(void* p);
 
-//  protected:
-//    SliderFSM* m_machine; 
-//    //Protected constructor to prevent accidental instantiation of abstract
-//    AbstractState(SliderFSM* machine) : m_machine(machine) {};
 };
 
 /****************************************************************************/
@@ -115,7 +111,13 @@ class ConcreteState : public AbstractState {
     virtual void end_stop(){};
 
     //By default, allow all transitions
-    virtual bool transition_allowed(STATES new_state){return false;};
+    virtual bool transition_allowed(STATES new_state); //We can't make this
+                                   //virtual, because the compiler can't be
+                                   //sure we won't instantiate a template
+                                   //that does not have it defined.  However,
+                                   //leaving it blank will mean the linker
+                                   //complains if template specializations
+                                   //do not define it.
 
     //actions to take when exiting this state (cleanup, etc.)
     virtual void exit_state(){};
@@ -138,10 +140,23 @@ class ConcreteState : public AbstractState {
 };
 /****************************************************************************/
 
+/*** Class declarations for the states **************************************/
+
 typedef ConcreteState<STATES::IDLE> StateIdle;
+typedef ConcreteState<STATES::FIRST_HOME> StateFirstHome;
+typedef ConcreteState<STATES::FIRST_ADJUST> StateFirstAdjust;
+typedef ConcreteState<STATES::FIRST_END_MOVE> StateFirstEndMove;
+typedef ConcreteState<STATES::SECOND_ADJUST> StateSecondAdjust;
+typedef ConcreteState<STATES::SECOND_HOME> StateSecondHome;
+typedef ConcreteState<STATES::WAIT> StateWait;
+typedef ConcreteState<STATES::EXECUTE> StateExecute;
+typedef ConcreteState<STATES::ERROR> StateError;
+typedef ConcreteState<STATES::REPEAT_WAIT> StateRepeatWait;
+typedef ConcreteState<STATES::REVERSE_EXECUTE> StateReverseExecute;
 
 /****************************************************************************/
-// Create a Finite State Machine
+
+/*** SliderFSM **************************************************************/
 class SliderFSM {
   public:
     SliderFSM();
@@ -157,170 +172,5 @@ class SliderFSM {
 };
 /****************************************************************************/
 
-/*** Idle state *************************************************************
-class StateIdle : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual void go_button();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual STATES get_state_as_enum();
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateIdle(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** First home state *******************************************************
-class StateFirstHome : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual void home_stop();
-    virtual void end_stop();
-    virtual STATES get_state_as_enum();
-    virtual void go_button();
-    //Default (no action) on: exit_state
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateFirstHome(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** First adjust state *******************************************************
-class StateFirstAdjust : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual STATES get_state_as_enum();
-    virtual void go_button();
-    //Default (no action) on: exit_state
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateFirstAdjust(SliderFSM* machine);
-    int m_update_counter;
-};
-/****************************************************************************/
-
-/*** First end move state ***************************************************
-class StateFirstEndMove : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual void home_stop();
-    virtual void end_stop();
-    virtual STATES get_state_as_enum();
-    virtual void go_button();
-    //Default (no action) on: exit_state
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateFirstEndMove(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** Second adjust state *******************************************************
-class StateSecondAdjust : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual STATES get_state_as_enum();
-    virtual void go_button();
-    //Default (no action) on: exit_state
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateSecondAdjust(SliderFSM* machine);
-    int m_update_counter;
-};
-/****************************************************************************/
-
-/*** Second home state ******************************************************
-class StateSecondHome : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual void home_stop();
-    virtual void end_stop();
-    virtual STATES get_state_as_enum();
-    virtual void go_button();
-    //Default (no action) on: exit_state
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateSecondHome(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** Wait state *************************************************************
-class StateWait : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual void go_button();
-    virtual bool transition_allowed(STATES new_state);
-    virtual STATES get_state_as_enum();
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateWait(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** Execute state **********************************************************
-class StateExecute : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual void go_button();
-    virtual void end_stop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual STATES get_state_as_enum();
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateExecute(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** Repeat Wait state ******************************************************
-class StateRepeatWait : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual void go_button();
-    virtual bool transition_allowed(STATES new_state);
-    virtual STATES get_state_as_enum();
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateRepeatWait(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** Reverse Execute state **************************************************
-class StateReverseExecute : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual void go_button();
-    virtual void home_stop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual STATES get_state_as_enum();
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateReverseExecute(SliderFSM* machine);
-};
-/****************************************************************************/
-
-/*** Error state ************************************************************
-class StateError : public AbstractState {
-  public:
-    virtual void run_loop();
-    virtual bool transition_allowed(STATES new_state);
-    virtual void enter_state();
-    virtual STATES get_state_as_enum();
-  protected:
-    friend SliderFSM; //Only let the state machine construct us
-    StateError(SliderFSM* machine);
-};
-/****************************************************************************/
 
 #endif

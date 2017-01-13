@@ -210,7 +210,7 @@ void SliderFSM::update_state(){
   delete m_state;
   switch (m_target_state) {
     case IDLE: 
-      m_state = new  StateIdle(this);/*
+      m_state = new  StateIdle(this);
       break;
     case FIRST_HOME:
       m_state = new StateFirstHome(this);
@@ -244,7 +244,7 @@ void SliderFSM::update_state(){
       break;
     default:
       ERR=ERROR_T::SOFTWARE;
-      m_state = new StateError(this);*/
+      m_state = new StateError(this);
   }
   m_target_state=STATES::NO_STATE;
   m_state->enter_state();
@@ -272,10 +272,10 @@ void StateIdle::go_button(){
   //else, wrong mode and ignore spurrious button push
 }
 
-//template<>
-//void StateIdle::transition_allowed(STATES new_state){
-//  return STATES::FIRST_HOME == new_state;
-//};
+template<>
+bool StateIdle::transition_allowed(STATES new_state){
+  return STATES::FIRST_HOME == new_state;
+};
 
 template<>
 void StateIdle::enter_state(){
