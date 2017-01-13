@@ -38,16 +38,6 @@ enum ERROR_T{
 };
 /****************************************************************************/
 
-/*** Class declarations for the states **************************************
-class StateIdle;
-class StateFirstHome;
-class StateFirstAdjust;
-class StateFirstEndMove;
-class StateSecondAdjust;
-class StateSecondHome;
-class StateWait;
-class StateExecute;*/
-
 class SliderFSM;
 /****************************************************************************/
 
@@ -98,7 +88,8 @@ class AbstractState {
 };
 
 /****************************************************************************/
-// This class is the abstract base class inherited by our states
+// This class is the concrete instantiation of our states - one template
+// specialization per state.
 template <STATES state>
 class ConcreteState : public AbstractState {
   public:

@@ -116,44 +116,7 @@ void back_off_stop(Bounce &stop){
 
 /****************************************************************************/
 
-/*** AbstractState **********************************************************
-AbstractState::~AbstractState(){}
-
-//template<>
-ConcreteState<>::~ConcreteState(){}
-
-template<STATES state>
-void ConcreteState::run_loop(){}
-template<>
-void ConcreteState::go_button(){}
-
-template<>
-void ConcreteState::home_stop(){}
-
-template<>
-void ConcreteState::end_stop(){}
-
-//bool AbstractState::transition_allowed(STATES new_state){return true;}
-
-template<>
-void ConcreteState::exit_state(){}
-
-template<>
-void ConcreteState::enter_state(){}
-
-//STATES AbstractState::get_state_as_enum(){}
-
-template<>
-void* ConcreteState::operator new(size_t sz){
-  return (void*)STATIC_MEMORY_ALLOCATION;
-}
-
-template<>
-void ConcreteState::operator delete(void* p){
-  //Technically, we should call the destructor here... but all our destructors
-  //are empty anyway, so we won't bother.
-}
-*/
+/*** AbstractState **********************************************************/
 void* AbstractState::operator new(size_t sz){
   return (void*)STATIC_MEMORY_ALLOCATION;
 };
@@ -179,8 +142,6 @@ void AbstractState::setCancel(){
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
 }
-
-//bool ConcreteState::transition_allowed(STATES new_state){return false;}
 /****************************************************************************/
 
 
@@ -213,7 +174,8 @@ void SliderFSM::change_state(STATES new_state){
 
 void SliderFSM::update_state(){
   //TODO: Technically, we should probably block interrupts here, because
-  //while we are in this function we are in an undefined state.
+  //while we are in this function we are in an undefined state.  But we aren't
+  //using interrupts.
 
   //if the transition is not allowed, it's a software error
   if (! m_state->transition_allowed(m_target_state)) {
