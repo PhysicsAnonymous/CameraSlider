@@ -35,6 +35,11 @@ long de_jitter(const long value){
 SWITCH_STATE read_3way(){
   bool video = !digitalRead(VIDEO_MODE_PIN);
   bool lapse = !digitalRead(LAPSE_MODE_PIN);
+  //TODO: remove these debug lines
+  Serial.print("video switch: ");
+  Serial.print(video);
+  Serial.print(" lapse switch: ");
+  Serial.println(lapse);
   if (video && lapse) { return SWITCH_STATE::INVALID; }
   else if (video) { return SWITCH_STATE::VIDEO_MODE; }
   else if (lapse) { return SWITCH_STATE::LAPSE_MODE; }
@@ -469,10 +474,30 @@ void StateExecute::enter_state(){
   float slider_sps = SLIDE_TARGET_STOP / secs;
   //camera pan steps per second
   float camera_sps = (CAMERA_TARGET_STOP - CAMERA_TARGET_START) / secs;
-  SLIDER_MOTOR.setSpeed(slider_sps);
   SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
-  CAMERA_MOTOR.setSpeed(camera_sps);
+  SLIDER_MOTOR.setSpeed(slider_sps);
   CAMERA_MOTOR.moveTo(CAMERA_TARGET_STOP);
+  CAMERA_MOTOR.setSpeed(camera_sps);
+  //TODO: debug, remove this serial code
+  Serial.print("raw speed: ");
+  Serial.println(raw_speed);
+  Serial.print("range: ");
+  Serial.println(range);
+  Serial.print("start: ");
+  Serial.println(start);
+  Serial.print("secs: ");
+  Serial.println(secs);
+  Serial.print("slider speed: ");
+  Serial.println(slider_sps);
+  Serial.print("camera speed: ");
+  Serial.println(camera_sps);
+  Serial.print("camera position: ");
+  Serial.println(CAMERA_MOTOR.currentPosition());
+  Serial.print("camera start: ");
+  Serial.println(CAMERA_TARGET_START);
+  Serial.print("camera end: ");
+  Serial.println(CAMERA_TARGET_STOP);
+  //TODO: end debug
 }
 
 bool StateExecute::transition_allowed(STATES new_state){
@@ -549,6 +574,8 @@ void loop() {
 }
 
 void setup() {
+//TODO: debug; remove serial
+Serial.begin(9600);
 pinMode(ERROR_LED_PIN, OUTPUT);
 digitalWrite(ERROR_LED_PIN, HIGH);
 
