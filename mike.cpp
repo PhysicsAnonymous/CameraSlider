@@ -13,7 +13,7 @@ long CAMERA_TARGET_START=0;
 long CAMERA_TARGET_STOP=0;
 long SLIDE_TARGET_STOP=SLIDER_MAX_POSITION;
 ERROR_T ERR=ERROR_T::NONE;
-char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::FIRST_ADJUST>)]; //Largest "state"
+char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::ADJUST>)]; //Largest "state"
 
 Bounce GO_BUTTON;
 Bounce HOME_STOP;
@@ -213,17 +213,13 @@ void SliderFSM::update_state(){
       DEBUG(F("State: First Home"));
       m_state = new StateFirstHome(this);
       break;
-    case FIRST_ADJUST:
-      DEBUG(F("State: FirstAdjust"));
-      m_state = new StateFirstAdjust(this);
+    case ADJUST:
+      DEBUG(F("State: Adjust"));
+      m_state = new StateAdjust(this);
       break;
     case FIRST_END_MOVE:
       DEBUG(F("State: FirstEndMove"));
       m_state = new StateFirstEndMove(this);
-      break;
-    case SECOND_ADJUST:
-      DEBUG(F("State: SecondAdjust"));
-      m_state = new StateSecondAdjust(this);
       break;
     case SECOND_HOME:
       DEBUG(F("State: SecondHome"));
@@ -273,8 +269,6 @@ void StateWait::go_button(){
     //If we are in programming mode and execute, we go home no matter what
     //we had previously been doing.
     NEXT_DIRECTION=HOMEWARD;
-    CAMERA_TARGET_START = 0; //clear previous settings
-    CAMERA_TARGET_STOP = 0;
     m_machine->change_state(STATES::FIRST_HOME);
   }
   else { //not in program mode
@@ -311,7 +305,7 @@ void StateFirstHome::run_loop(){
 
 template<>
 bool StateFirstHome::transition_allowed(STATES new_state){
-  return new_state == STATES::FIRST_ADJUST;
+  return new_state == STATES::ADJUST;
 };
 
 template<>
@@ -339,7 +333,7 @@ void StateFirstHome::home_stop(){
   back_off_stop(HOME_STOP);
   SLIDER_MOTOR.setCurrentPosition(0);
   HAVE_HOMED=true;
-  m_machine->change_state(STATES::FIRST_ADJUST);
+  m_machine->change_state(STATES::ADJUST);
 }
 
 template<>
@@ -355,10 +349,9 @@ void StateFirstHome::go_button(){
 }
 /****************************************************************************/
 
-
-/*** First adjust state *****************************************************/
+/*** Adjust state ***********************************************************/
 template<>
-void StateFirstAdjust::run_loop(){
+void StateAdjust::run_loop(){
   //Only read the pot every TICKS_PER_POT_READ, because Analog read is slow.
   static int counter = 0;
   if (0 >= counter){
@@ -371,19 +364,21 @@ void StateFirstAdjust::run_loop(){
 }
 
 template<>
-bool StateFirstAdjust::transition_allowed(STATES new_state){
-  return new_state == STATES::FIRST_END_MOVE;
+bool StateAdjust::transition_allowed(STATES new_state){
+  return new_state == STATES::FIRST_END_MOVE ||
+         new_state == STATES::SECOND_HOME;
 };
 
 template<>
-void StateFirstAdjust::enter_state(){
-  CAMERA_MOTOR.setCurrentPosition(0);
-}
-
-template<>
-void StateFirstAdjust::go_button(){
-  CAMERA_TARGET_START = CAMERA_MOTOR.currentPosition();
-  m_machine->change_state(STATES::FIRST_END_MOVE);
+void StateAdjust::go_button(){
+  if(ENDWARD == NEXT_DIRECTION) {
+    CAMERA_TARGET_START = CAMERA_MOTOR.currentPosition();
+    m_machine->change_state(STATES::FIRST_END_MOVE);
+  }
+  else {
+    CAMERA_TARGET_STOP = CAMERA_MOTOR.currentPosition();
+    m_machine->change_state(STATES::SECOND_HOME);
+  }
 }
 /****************************************************************************/
 
@@ -392,13 +387,13 @@ template<>
 void StateFirstEndMove::run_loop(){
   SLIDER_MOTOR.run();
   if (0 == SLIDER_MOTOR.distanceToGo()){
-    m_machine->change_state(STATES::SECOND_ADJUST);
+    m_machine->change_state(STATES::ADJUST);
   }
 }
 
 template<>
 bool StateFirstEndMove::transition_allowed(STATES new_state){
-  return new_state == STATES::SECOND_ADJUST;
+  return new_state == STATES::ADJUST;
 };
 
 template<>
@@ -423,39 +418,13 @@ void StateFirstEndMove::end_stop(){
   back_off_stop(END_STOP);
   SLIDE_TARGET_STOP = SLIDER_MOTOR.currentPosition();
   SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
-  m_machine->change_state(STATES::SECOND_ADJUST);
+  m_machine->change_state(STATES::ADJUST);
 }
 
 template<>
 void StateFirstEndMove::go_button(){
   //The "go" button is now "stop."  Like pressing the "start menu" to shut down.
   setCancel();
-}
-/****************************************************************************/
-
-/*** Second adjust state ****************************************************/
-template<>
-void StateSecondAdjust::run_loop(){
-  //Only read the pot every TICKS_PER_POT_READ, because Analog read is slow.
-  static int counter = 0;
-  if (0 >= counter){
-    long target_pos=read_camera_pot();
-    CAMERA_MOTOR.moveTo(target_pos);
-    counter = TICKS_PER_POT_READ;
-  }
-  CAMERA_MOTOR.run();
-  counter--;
-}
-
-template<>
-bool StateSecondAdjust::transition_allowed(STATES new_state){
-  return new_state == STATES::SECOND_HOME;
-};
-
-template<>
-void StateSecondAdjust::go_button(){
-  CAMERA_TARGET_STOP = CAMERA_MOTOR.currentPosition();
-  m_machine->change_state(STATES::SECOND_HOME);
 }
 /****************************************************************************/
 
@@ -660,6 +629,7 @@ void StateError::run_loop(){
     case NONE:
       //We shouldn't have an error if it's none.  Which makes this... a
       //software error?  Follow through with software error part:
+      DEBUG(F("ERROR NONE?"));
     case SOFTWARE:
       for (int i = 0; i<3; i++) {
         digitalWrite(ERROR_LED_PIN, HIGH);

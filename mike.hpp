@@ -13,9 +13,8 @@ typedef unsigned int size_t;
 enum STATES {
   NO_STATE=0,
   FIRST_HOME, 
-  FIRST_ADJUST,
+  ADJUST,
   FIRST_END_MOVE,
-  SECOND_ADJUST,
   SECOND_HOME,
   WAIT,
   EXECUTE,
@@ -122,16 +121,13 @@ class ConcreteState : public AbstractState {
 
 /*** Class declarations for the states **************************************/
 
-//typedef ConcreteState<STATES::IDLE> StateIdle;
 typedef ConcreteState<STATES::FIRST_HOME> StateFirstHome;
-typedef ConcreteState<STATES::FIRST_ADJUST> StateFirstAdjust;
+typedef ConcreteState<STATES::ADJUST> StateAdjust;
 typedef ConcreteState<STATES::FIRST_END_MOVE> StateFirstEndMove;
-typedef ConcreteState<STATES::SECOND_ADJUST> StateSecondAdjust;
 typedef ConcreteState<STATES::SECOND_HOME> StateSecondHome;
 typedef ConcreteState<STATES::WAIT> StateWait;
 typedef ConcreteState<STATES::EXECUTE> StateExecute;
 typedef ConcreteState<STATES::ERROR> StateError;
-//typedef ConcreteState<STATES::REPEAT_WAIT> StateRepeatWait;
 typedef ConcreteState<STATES::REVERSE_EXECUTE> StateReverseExecute;
 
 /****************************************************************************/
