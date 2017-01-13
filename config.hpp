@@ -11,7 +11,7 @@
 #define SLIDER_MAX_SPEED 8000.0
 //Max possible position is 2,147,483,647.  
 //Can be a function like steps/inch * inches
-#define SLIDER_MAX_POSITION -900//(-400 * 32)//-860 * 32
+#define SLIDER_MAX_POSITION (-400 * 32)//-900 * 32
 #define MAX_HOMING_SPEED 1000
 /****************************************************************************/
 

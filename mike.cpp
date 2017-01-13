@@ -70,7 +70,7 @@ long read_camera_pot(){
   #ifdef REVERSE_CAMERA_POT
   pos_raw = 1023 - pos_raw;
   #endif // REVERSE_CAMERA_POT
-  DEBUG(F("raw camera pot: "),pos_raw);
+  //DEBUG(F("raw camera pot: "),pos_raw);
   //make sure there was a real change, so we aren't going back and forth
   //between two very close values.
   pos_raw = de_jitter(pos_raw);
@@ -85,7 +85,7 @@ float calculate_travel_time(){
   #ifdef REVERSE_SPEED_POT
     raw_speed = 1023 - raw_speed;
   #endif //REVERSE_SPEED_POT
-  DEBUG(F("raw speed pot"),raw_speed);
+  //DEBUG(F("raw speed pot"),raw_speed);
   long range,start;
   //Get the range (from 5 seconds to 30 seconds has a 25 second range)
   //and then scale it by the value of the slider (2.5v out of 5v would
@@ -109,13 +109,14 @@ float calculate_travel_time(){
 }
 
 void back_off_stop(Bounce &stop){
-  long direction = HOMEWARD;
+  long direction = ENDWARD;
   if(&END_STOP == &stop){
-    direction*=-1;
+    direction = HOMEWARD;
   }
   digitalWrite(ERROR_LED_PIN, HIGH);
-  long distance=max(SLIDER_MAX_POSITION/2000,10) * direction;
-  while (stop.update() && !stop.read()){
+  long distance= 10 * direction; //Arbitrary number of steps
+  stop.update();
+  while (!stop.read()){
     SLIDER_MOTOR.move(distance);
     DEBUG(F("backing off stop (steps): "),distance);
     while(0 != SLIDER_MOTOR.distanceToGo()){
@@ -123,6 +124,7 @@ void back_off_stop(Bounce &stop){
     }
     //wait to ensure there's no button bounce
     delay(min(DEBOUNCE_INTERVAL/100,1));
+    stop.update();
   }
   digitalWrite(ERROR_LED_PIN, LOW);
 }
@@ -594,7 +596,7 @@ bool StateError::transition_allowed(STATES new_state){
 /*** Main *******************************************************************/
 void loop() {
   static int counter = 0;
-  #define COUNTER_MAX 30
+  #define COUNTER_MAX 9
   #define COUNTER_STEP COUNTER_MAX / 3
   state_machine.run_loop();
   if(COUNTER_STEP == counter){
