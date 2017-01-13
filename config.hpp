@@ -35,10 +35,10 @@
 /*** Timing constants *******************************************************/
 //Time in seconds to traverse the length of the slider in both modes
 #define VIDEO_TRAVERSAL_TIME_MIN 4
-#define VIDEO_TRAVERSAL_TIME_MAX 30
+#define VIDEO_TRAVERSAL_TIME_MAX 15 //30
 
-#define LAPSE_TRAVERSAL_TIME_MIN 30
-#define LAPSE_TRAVERSAL_TIME_MAX 60 * 60 * 1 //60 seconds * 60 minutes *1 hour
+#define LAPSE_TRAVERSAL_TIME_MIN 20//30
+#define LAPSE_TRAVERSAL_TIME_MAX 60//60 * 60 * 1 //60 seconds * 60 minutes *1 hour
 /****************************************************************************/
 
 /*** Button constants *******************************************************/
