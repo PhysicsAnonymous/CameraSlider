@@ -14,10 +14,6 @@
 #define SLIDER_MAX_POSITION -400 * 32//-860 * 32
 //How many steps to try at a time while backing off
 #define BACK_OFF_STEP SLIDER_MAX_POSITION/1000;
-//If we head to zero, but hit the "home" switch a few ticks early, that's
-//okay - but if we're way off that isn't.  This is the maximum steps we can
-//be different from zero and still call it "home"
-#define MAX_REHOME_DIFFERENCE 100
 #define MAX_HOMING_SPEED 1000
 /****************************************************************************/
 

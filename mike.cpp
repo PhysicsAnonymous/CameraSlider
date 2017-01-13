@@ -1,5 +1,6 @@
 
-#include "Arduino.h"
+#include <Arduino.h>
+#include <limits.h>
 #include "AccelStepper/AccelStepper.cpp"
 #include "Bounce2-master/Bounce2.cpp"
 #include "mike.hpp"
@@ -18,10 +19,30 @@ Bounce GO_BUTTON;
 Bounce HOME_STOP;
 Bounce END_STOP;
 
+bool HAVE_HOMED=false;
+
+int NEXT_DIRECTION=ENDWARD;
+
 STATES REPEAT_TOGGLE=STATES::REVERSE_EXECUTE;
 /****************************************************************************/
 
 /*** Utility functions ******************************************************/
+
+template<class M, class T>
+void DEBUG(const M msg, const T value){
+  #ifdef DEBUG_OUTPUT
+    Serial.print(msg);
+    Serial.println(value);
+  #endif
+}
+
+template<class T>
+void DEBUG(const T msg){
+  #ifdef DEBUG_OUTPUT
+    Serial.print(msg);
+  #endif
+}
+
 long de_jitter(const long value){
   static int previous = 0;
   if (abs(previous - value) <= MIN_CAMERA_JITTER){
@@ -34,12 +55,8 @@ long de_jitter(const long value){
 SWITCH_STATE read_3way(){
   bool video = !digitalRead(VIDEO_MODE_PIN);
   bool lapse = !digitalRead(LAPSE_MODE_PIN);
-  #ifdef DEBUG_OUTPUT
-    Serial.print("video switch: ");
-    Serial.print(video);
-    Serial.print(" lapse switch: ");
-    Serial.println(lapse);
-  #endif //DEBUG_OUTPUT
+  DEBUG(F("vswitch: "), video);
+  DEBUG(F("lswitch: "), lapse);
   if (video && lapse) { return SWITCH_STATE::INVALID; }
   else if (video) { return SWITCH_STATE::VIDEO_MODE; }
   else if (lapse) { return SWITCH_STATE::LAPSE_MODE; }
@@ -51,10 +68,7 @@ long read_camera_pot(){
   #ifdef REVERSE_CAMERA_POT
   pos_raw = 1023 - pos_raw;
   #endif // REVERSE_CAMERA_POT
-  #ifdef DEBUG_OUTPUT
-    Serial.print("raw camera pot");
-    Serial.println(pos_raw);
-  #endif //DEBUG_OUTPUT
+  DEBUG(F("raw camera pot: "),pos_raw);
   //make sure there was a real change, so we aren't going back and forth
   //between two very close values.
   pos_raw = de_jitter(pos_raw);
@@ -69,10 +83,7 @@ float calculate_travel_time(){
   #ifdef REVERSE_SPEED_POT
     raw_speed = 1023 - raw_speed;
   #endif //REVERSE_SPEED_POT
-  #ifdef DEBUG_OUTPUT
-    Serial.print("raw speed pot");
-    Serial.println(raw_speed);
-  #endif //DEBUG_OUTPUT
+  DEBUG(F("raw speed pot"),raw_speed);
   long range,start;
   //Get the range (from 5 seconds to 30 seconds has a 25 second range)
   //and then scale it by the value of the slider (2.5v out of 5v would
@@ -113,6 +124,9 @@ void back_off_stop(Bounce &stop){
   digitalWrite(ERROR_LED_PIN, LOW);
 }
 
+bool have_camera_targets(){
+  return CAMERA_TARGET_START || CAMERA_TARGET_STOP;
+}
 
 /****************************************************************************/
 
@@ -141,6 +155,16 @@ void AbstractState::setUnknownError(){
 void AbstractState::setCancel(){
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
+}
+
+void AbstractState::transitionOrError(const int direction, const STATES state){
+  if (direction == NEXT_DIRECTION){
+    m_machine->change_state(state);
+  }
+  else {
+    //it's a software error to have gone the wrong way.
+    setSoftwareError();
+  }
 }
 /****************************************************************************/
 
@@ -182,43 +206,47 @@ void SliderFSM::update_state(){
     ERR=ERROR_T::SOFTWARE;
     m_target_state=STATES::ERROR;
   }
-  m_state->exit_state();
+  m_state->exit_state(); //exit our current state before entering new one
   delete m_state;
   switch (m_target_state) {
-    case IDLE: 
-      m_state = new  StateIdle(this);
-      break;
     case FIRST_HOME:
+      DEBUG(F("State: First Home"));
       m_state = new StateFirstHome(this);
       break;
     case FIRST_ADJUST:
+      DEBUG(F("State: FirstAdjust"));
       m_state = new StateFirstAdjust(this);
       break;
     case FIRST_END_MOVE:
+      DEBUG(F("State: FirstEndMove"));
       m_state = new StateFirstEndMove(this);
       break;
     case SECOND_ADJUST:
+      DEBUG(F("State: SecondAdjust"));
       m_state = new StateSecondAdjust(this);
       break;
     case SECOND_HOME:
+      DEBUG(F("State: SecondHome"));
       m_state = new StateSecondHome(this);
       break;
     case WAIT:
+      DEBUG(F("State: Wait"));
       m_state = new StateWait(this);
       break;
     case EXECUTE:
+      DEBUG(F("State: Execute"));
       m_state = new StateExecute(this);
       break;
     case ERROR:
+      DEBUG(F("State: Error"));
       m_state = new StateError(this);
       break;
     case REVERSE_EXECUTE:
+      DEBUG(F("State: ReverseExecute"));
       m_state = new StateReverseExecute(this);
       break;
-    case REPEAT_WAIT:
-      m_state = new StateRepeatWait(this);
-      break;
     default:
+      DEBUG(F("Invalid State selected"),m_target_state);
       ERR=ERROR_T::SOFTWARE;
       m_state = new StateError(this);
   }
@@ -227,45 +255,58 @@ void SliderFSM::update_state(){
 }
 
 SliderFSM::SliderFSM() {
-  m_state = new StateIdle(this);
+  m_state = new StateWait(this);
   m_state->enter_state();
   m_target_state = STATES::NO_STATE;
 }
 /****************************************************************************/
 
-/*** Idle state *************************************************************/
+/*** Wait state *************************************************************/
 template<>
-void StateIdle::run_loop(){
+void StateWait::run_loop(){
   delay(1);
 }
 
 template<>
-void StateIdle::go_button(){
+void StateWait::go_button(){
   if (SWITCH_STATE::PROGRAM_MODE == read_3way()){
-    //Transition to programming state, if the 3-way switch is set to program.
+    //If we are in programming mode and execute, we go home no matter what
+    //we had previously been doing.
+    NEXT_DIRECTION=HOMEWARD;
+    CAMERA_TARGET_START = 0; //clear previous settings
+    CAMERA_TARGET_STOP = 0;
     m_machine->change_state(STATES::FIRST_HOME);
   }
-  //else, wrong mode and ignore spurrious button push
+  else { //not in program mode
+    //as long as we have established a home, go ahead and run
+    if (HAVE_HOMED) {
+      if(ENDWARD == NEXT_DIRECTION) {
+        m_machine->change_state(STATES::EXECUTE);
+      }
+      else {//we're facing backward
+        m_machine->change_state(STATES::REVERSE_EXECUTE);
+      }
+    }
+    else { //not in program mode, and have no targets/home set
+      setUnknownError(); // Not really an error, just blink to let user 
+                         //know we are not in the right mode! (program mode)
+    }
+  }
 }
 
 template<>
-bool StateIdle::transition_allowed(STATES new_state){
-  return STATES::FIRST_HOME == new_state;
-};
-
-template<>
-void StateIdle::enter_state(){
-  SLIDER_MOTOR.disableOutputs();
-  CAMERA_MOTOR.disableOutputs();
-};
-
+bool StateWait::transition_allowed(STATES new_state){
+  return new_state == FIRST_HOME || 
+         new_state == EXECUTE ||
+         new_state == REVERSE_EXECUTE;
+}
 /****************************************************************************/
 
 /*** First home state *******************************************************/
 template<>
 void StateFirstHome::run_loop(){
   SLIDER_MOTOR.runSpeed();
-  CAMERA_MOTOR.run();
+  CAMERA_MOTOR.run(); //Camera should already be at correct position
 }
 
 template<>
@@ -275,26 +316,35 @@ bool StateFirstHome::transition_allowed(STATES new_state){
 
 template<>
 void StateFirstHome::enter_state(){
+  //Set everything back to defaults
+  CAMERA_TARGET_START=0;
+  CAMERA_TARGET_STOP=0;
   SLIDER_MOTOR.enableOutputs();
   CAMERA_MOTOR.enableOutputs();
-  if (!CAMERA_TARGET_START && !CAMERA_TARGET_STOP) {
-    //If this is our first run, assume we are pointing the right way
-      CAMERA_MOTOR.setCurrentPosition(0);
-  }
+  CAMERA_MOTOR.setCurrentPosition(0);
   CAMERA_MOTOR.moveTo(0);
-  SLIDER_MOTOR.move(-2147483648); //maximum negative distance
+  long target = LONG_MAX; //Unfortunately the macro processor complains if
+  target *= HOMEWARD;     //we try to do this math with macros
+  SLIDER_MOTOR.move(target); //maximum negative distance
   SLIDER_MOTOR.setSpeed(MAX_HOMING_SPEED);
+}
+
+template<>
+void StateFirstHome::exit_state(){
+  NEXT_DIRECTION = ENDWARD;
 }
 
 template<>
 void StateFirstHome::home_stop(){
   back_off_stop(HOME_STOP);
   SLIDER_MOTOR.setCurrentPosition(0);
+  HAVE_HOMED=true;
   m_machine->change_state(STATES::FIRST_ADJUST);
 }
 
 template<>
 void StateFirstHome::end_stop(){
+  DEBUG(F("We went the wrong way"));
   setSoftwareError();
 }
 
@@ -304,6 +354,7 @@ void StateFirstHome::go_button(){
   setCancel();
 }
 /****************************************************************************/
+
 
 /*** First adjust state *****************************************************/
 template<>
@@ -356,19 +407,22 @@ void StateFirstEndMove::enter_state(){
 }
 
 template<>
+void StateFirstEndMove::exit_state(){
+  NEXT_DIRECTION = HOMEWARD;
+}
+
+template<>
 void StateFirstEndMove::home_stop(){
+  DEBUG(F("We went the wrong way"));
   setSoftwareError();
 }
 
 template<>
 void StateFirstEndMove::end_stop(){
-  //Oops, we over-shot.  No problem, just stop quickly and update our target:
+  //Oops, we over-shot.  No problem, just update our target:
   back_off_stop(END_STOP);
   SLIDE_TARGET_STOP = SLIDER_MOTOR.currentPosition();
   SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
-  SLIDER_MOTOR.runToPosition(); //Go back to the position we just marked,
-                                          //in case we over-shot.  Not sure if
-                                          //this would actually work.
   m_machine->change_state(STATES::SECOND_ADJUST);
 }
 
@@ -427,20 +481,19 @@ void StateSecondHome::enter_state(){
 }
 
 template<>
+void StateSecondHome::exit_state(){
+  NEXT_DIRECTION = ENDWARD;
+}
+
+template<>
 void StateSecondHome::home_stop(){
   //Make sure we stopped close enough to zero:
   back_off_stop(HOME_STOP);
-  long pos = SLIDER_MOTOR.currentPosition();
-  if (pos > MAX_REHOME_DIFFERENCE){
-    ERR=ERROR_T::UNKNOWN;
-    m_machine->change_state(STATES::ERROR); }
-  else {
-    //update our targets based on our hitting home this time
-    //(since this time we should have been almost stopped when we hit)
-    //SLIDE_TARGET_STOP+=pos; //Don't update this since it's somewhat arbitrary anyway
-    SLIDER_MOTOR.setCurrentPosition(0);
-    m_machine->change_state(STATES::WAIT);
-  }
+  SLIDER_MOTOR.setCurrentPosition(0);
+  m_machine->change_state(STATES::WAIT);
+  //This blocks, but also should never not be finished (so it should return
+  //almost immediately)
+  CAMERA_MOTOR.runToPosition(); //make sure our camera movement is finished too!
 }
 
 template<>
@@ -455,27 +508,6 @@ void StateSecondHome::go_button(){
 }
 /****************************************************************************/
 
-/*** Wait state *************************************************************/
-template<>
-void StateWait::run_loop(){
-  delay(1);
-}
-
-template<>
-void StateWait::go_button(){
-  if (SWITCH_STATE::PROGRAM_MODE != read_3way()){
-    m_machine->change_state(STATES::EXECUTE);
-  }
-  //If we haven't chosen video or lapse mode, ignore the execute and wait.
-}
-
-template<>
-bool StateWait::transition_allowed(STATES new_state){
-  return STATES::EXECUTE == new_state;
-};
-
-/****************************************************************************/
-
 /*** Execute state **********************************************************/
 template<>
 void StateExecute::run_loop(){
@@ -483,7 +515,7 @@ void StateExecute::run_loop(){
   CAMERA_MOTOR.runSpeedToPosition();
   if (0 == SLIDER_MOTOR.distanceToGo() &&
       0 == CAMERA_MOTOR.distanceToGo()){
-    m_machine->change_state(STATES::REPEAT_WAIT); //All done!
+    m_machine->change_state(STATES::WAIT); //All done!
   }
 }
 
@@ -497,7 +529,7 @@ template<>
 void StateExecute::end_stop(){
   back_off_stop(END_STOP);
   //All done, even if we didn't quite hit our targets
-  m_machine->change_state(STATES::REPEAT_WAIT);
+  m_machine->change_state(STATES::WAIT);
 }
 
 template<>
@@ -538,33 +570,13 @@ void StateExecute::enter_state(){
 }
 
 template<>
+void StateExecute::exit_state(){
+  NEXT_DIRECTION = HOMEWARD;
+}
+
+template<>
 bool StateExecute::transition_allowed(STATES new_state){
-  return STATES::REPEAT_WAIT == new_state;
-};
-/****************************************************************************/
-
-/*** RepeatWait state *******************************************************/
-template<>
-void StateRepeatWait::run_loop(){
-  delay(1);
-}
-
-template<>
-void StateRepeatWait::go_button(){
-  if (SWITCH_STATE::PROGRAM_MODE != read_3way()){
-    m_machine->change_state(REPEAT_TOGGLE);
-  }
-  else {
-    //Otherwise, re-home and start again.
-    m_machine->change_state(STATES::FIRST_HOME);
-  }
-}
-
-template<>
-bool StateRepeatWait::transition_allowed(STATES new_state){
-  return STATES::FIRST_HOME == new_state || 
-         STATES::REVERSE_EXECUTE == new_state || 
-         STATES::EXECUTE == new_state;
+  return STATES::WAIT == new_state;
 };
 /****************************************************************************/
 
@@ -575,7 +587,7 @@ void StateReverseExecute::run_loop(){
   CAMERA_MOTOR.runSpeedToPosition();
   if (0 == SLIDER_MOTOR.distanceToGo() &&
       0 == CAMERA_MOTOR.distanceToGo()){
-    m_machine->change_state(STATES::REPEAT_WAIT); //All done!
+    m_machine->change_state(STATES::WAIT); //All done!
   }
 }
 
@@ -589,7 +601,7 @@ template<>
 void StateReverseExecute::home_stop(){
   //All done, even if we didn't quite hit our targets
     back_off_stop(HOME_STOP);
-  m_machine->change_state(STATES::REPEAT_WAIT);
+  m_machine->change_state(STATES::WAIT);
 }
 
 template<>
@@ -630,8 +642,13 @@ void StateReverseExecute::enter_state(){
 }
 
 template<>
+void StateReverseExecute::exit_state(){
+  NEXT_DIRECTION = ENDWARD;
+}
+
+template<>
 bool StateReverseExecute::transition_allowed(STATES new_state){
-  return STATES::REPEAT_WAIT == new_state;
+  return STATES::WAIT == new_state;
 };
 /****************************************************************************/
 
@@ -667,7 +684,7 @@ void StateError::run_loop(){
   #endif
   //if we haven't defined an error pin, just leave this mode.
   ERR=ERROR_T::NONE;
-  m_machine->change_state(STATES::IDLE);
+  m_machine->change_state(STATES::WAIT);
 }
 
 template<>
@@ -678,7 +695,7 @@ void StateError::enter_state(){
 
 template<>
 bool StateError::transition_allowed(STATES new_state){
-  return STATES::IDLE == new_state;
+  return STATES::WAIT == new_state;
 };
 /****************************************************************************/
 

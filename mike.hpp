@@ -6,10 +6,12 @@
 //We need size_t defined locally for some reason
 typedef unsigned int size_t;
 
+#define ENDWARD SLIDER_MAX_POSITION / SLIDER_MAX_POSITION
+#define HOMEWARD ENDWARD * -1
+
 /****************************************************************************/
 enum STATES {
   NO_STATE=0,
-  IDLE,
   FIRST_HOME, 
   FIRST_ADJUST,
   FIRST_END_MOVE,
@@ -18,9 +20,7 @@ enum STATES {
   WAIT,
   EXECUTE,
   ERROR,
-  REPEAT_WAIT,
-  REVERSE_EXECUTE,
-  MAX_STATES
+  REVERSE_EXECUTE
 };
 
 enum SWITCH_STATE{
@@ -61,7 +61,7 @@ class AbstractState {
     //Action to take when the "end" stop is activated (default to ignore)
     virtual void end_stop()=0;
 
-    //By default, allow all transitions
+    //Limit transitions to ones we approve of in advance
     virtual bool transition_allowed(STATES new_state)=0;
 
     //actions to take when exiting this state (cleanup, etc.)
@@ -81,6 +81,9 @@ class AbstractState {
     void setSoftwareError();
     void setUnknownError();
     void setCancel();
+    //transitions to state if provided direction matches NEXT_DIRECTION,
+    //transitions to error otherwise.
+    void transitionOrError(const int direction, const STATES state);
 
     AbstractState(SliderFSM* machine) : m_machine(machine){};
     SliderFSM* m_machine; 
@@ -95,21 +98,10 @@ class ConcreteState : public AbstractState {
   public:
     virtual ~ConcreteState(){};
 
-//State classes override this function to be called at regular intervals
-    //in the main loop.  (default to nothing)
     virtual void run_loop(){};
-
-    //Action to take in this state when the red "go" or "set" button is pressed
-    //(default to no ignore)
     virtual void go_button(){};
-
-    //Action to take when the "home" stop is activated (default to ignore)
     virtual void home_stop(){};
-
-    //Action to take when the "end" stop is activated (default to ignore)
     virtual void end_stop(){};
-
-    //By default, allow all transitions
     virtual bool transition_allowed(STATES new_state); //We can't make this
                                    //virtual, because the compiler can't be
                                    //sure we won't instantiate a template
@@ -117,19 +109,9 @@ class ConcreteState : public AbstractState {
                                    //leaving it blank will mean the linker
                                    //complains if template specializations
                                    //do not define it.
-
-    //actions to take when exiting this state (cleanup, etc.)
     virtual void exit_state(){};
-
-    //actions to take when entering this state
     virtual void enter_state(){};
-
-    //Just returns the enum associated with the current state
     virtual STATES get_state_as_enum(){return state;};
-
-    //void* operator new(size_t sz);
-
-    //void operator delete(void* p);
 
   protected:
     //Protected constructor to prevent accidental instantiation of abstract
@@ -140,7 +122,7 @@ class ConcreteState : public AbstractState {
 
 /*** Class declarations for the states **************************************/
 
-typedef ConcreteState<STATES::IDLE> StateIdle;
+//typedef ConcreteState<STATES::IDLE> StateIdle;
 typedef ConcreteState<STATES::FIRST_HOME> StateFirstHome;
 typedef ConcreteState<STATES::FIRST_ADJUST> StateFirstAdjust;
 typedef ConcreteState<STATES::FIRST_END_MOVE> StateFirstEndMove;
@@ -149,7 +131,7 @@ typedef ConcreteState<STATES::SECOND_HOME> StateSecondHome;
 typedef ConcreteState<STATES::WAIT> StateWait;
 typedef ConcreteState<STATES::EXECUTE> StateExecute;
 typedef ConcreteState<STATES::ERROR> StateError;
-typedef ConcreteState<STATES::REPEAT_WAIT> StateRepeatWait;
+//typedef ConcreteState<STATES::REPEAT_WAIT> StateRepeatWait;
 typedef ConcreteState<STATES::REVERSE_EXECUTE> StateReverseExecute;
 
 /****************************************************************************/
