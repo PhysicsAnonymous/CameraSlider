@@ -87,6 +87,13 @@ class AbstractState {
 
     void operator delete(void* p);
 
+    void setSoftwareError();
+    void setUnknownError();
+    void setCancel();
+
+    AbstractState(SliderFSM* machine) : m_machine(machine){};
+    SliderFSM* m_machine; 
+
 };
 
 /****************************************************************************/
@@ -133,9 +140,8 @@ class ConcreteState : public AbstractState {
     //void operator delete(void* p);
 
   protected:
-    SliderFSM* m_machine; 
     //Protected constructor to prevent accidental instantiation of abstract
-    ConcreteState(SliderFSM* machine) : m_machine(machine) {};
+    ConcreteState(SliderFSM* machine) : AbstractState(machine) {};
     friend SliderFSM;
 };
 /****************************************************************************/

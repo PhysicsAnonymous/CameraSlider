@@ -4,9 +4,6 @@
 #include "Bounce2-master/Bounce2.cpp"
 #include "mike.hpp"
 
-//void TBD(const char * str){};
-
-
 /*** Global data ************************************************************/
 AccelStepper SLIDER_MOTOR(AccelStepper::DRIVER, SLIDER_STEP_PIN, SLIDER_DIR_PIN);
 AccelStepper CAMERA_MOTOR(AccelStepper::DRIVER, CAMERA_STEP_PIN, CAMERA_DIR_PIN);
@@ -26,7 +23,7 @@ STATES REPEAT_TOGGLE=STATES::REVERSE_EXECUTE;
 
 /*** Utility functions ******************************************************/
 long de_jitter(const long value){
-  static long previous = 0;
+  static int previous = 0;
   if (abs(previous - value) <= MIN_CAMERA_JITTER){
     return previous;
   }
@@ -164,6 +161,23 @@ void* AbstractState::operator new(size_t sz){
 void AbstractState::operator delete(void* p){
   //Technically, we should call the destructor here... but all our destructors
   //are empty anyway, so we won't bother.
+}
+
+//These could be templates too, but typing the function name is easier than
+//typing the template.
+void AbstractState::setSoftwareError(){
+  ERR=ERROR_T::SOFTWARE;
+  m_machine->change_state(STATES::ERROR);
+}
+
+void AbstractState::setUnknownError(){
+  ERR=ERROR_T::UNKNOWN;
+  m_machine->change_state(STATES::ERROR);
+}
+
+void AbstractState::setCancel(){
+  ERR=ERROR_T::CANCEL;
+  m_machine->change_state(STATES::ERROR);
 }
 
 //bool ConcreteState::transition_allowed(STATES new_state){return false;}
@@ -766,15 +780,6 @@ pinMode(CAMERA_POT_PIN, INPUT);
 
 digitalWrite(ERROR_LED_PIN, LOW);
 }
-
-/*
-int main(void){
-  setup();
-  while(true){
-    loop();
-  }
-  return 0;
-}*/
 
 /****************************************************************************/
 
