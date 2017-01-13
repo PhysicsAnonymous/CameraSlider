@@ -108,13 +108,15 @@ float calculate_travel_time(){
   return secs;
 }
 
-void back_off_stop(Bounce &stop){
+//initial guess is how far past the stop we *think* we went.  Guess 10 if
+//we are clueless.
+void back_off_stop(Bounce &stop, const long initial_guess = 10){
   long direction = ENDWARD;
   if(&END_STOP == &stop){
     direction = HOMEWARD;
   }
   digitalWrite(ERROR_LED_PIN, HIGH);
-  long distance= 10 * direction; //Arbitrary number of steps
+  long distance= initial_guess * direction; //Arbitrary number of steps
   stop.update();
   while (!stop.read()){
     SLIDER_MOTOR.move(distance);
@@ -316,7 +318,10 @@ void StateFirstHome::exit_state(){
 
 template<>
 void StateFirstHome::home_stop(){
-  back_off_stop(HOME_STOP);
+  SLIDER_MOTOR.stop();
+  long overshoot = SLIDER_MOTOR.distanceToGo();
+  SLIDER_MOTOR.runToPosition(); //impliment the stop.
+  back_off_stop(HOME_STOP,overshoot);
   SLIDER_MOTOR.setCurrentPosition(0);
   HAVE_HOMED=true;
   m_machine->change_state(STATES::ADJUST);
