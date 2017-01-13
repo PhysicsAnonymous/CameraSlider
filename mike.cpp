@@ -22,8 +22,6 @@ Bounce END_STOP;
 bool HAVE_HOMED=false;
 
 int NEXT_DIRECTION=ENDWARD;
-
-STATES REPEAT_TOGGLE=STATES::REVERSE_EXECUTE;
 /****************************************************************************/
 
 /*** Utility functions ******************************************************/
@@ -237,10 +235,6 @@ void SliderFSM::update_state(){
       DEBUG(F("State: Error"));
       m_state = new StateError(this);
       break;
-    case REVERSE_EXECUTE:
-      DEBUG(F("State: ReverseExecute"));
-      m_state = new StateReverseExecute(this);
-      break;
     default:
       DEBUG(F("Invalid State selected"),m_target_state);
       ERR=ERROR_T::SOFTWARE;
@@ -274,12 +268,7 @@ void StateWait::go_button(){
   else { //not in program mode
     //as long as we have established a home, go ahead and run
     if (HAVE_HOMED) {
-      if(ENDWARD == NEXT_DIRECTION) {
-        m_machine->change_state(STATES::EXECUTE);
-      }
-      else {//we're facing backward
-        m_machine->change_state(STATES::REVERSE_EXECUTE);
-      }
+      m_machine->change_state(STATES::EXECUTE);
     }
     else { //not in program mode, and have no targets/home set
       setUnknownError(); // Not really an error, just blink to let user 
@@ -291,8 +280,7 @@ void StateWait::go_button(){
 template<>
 bool StateWait::transition_allowed(STATES new_state){
   return new_state == FIRST_HOME || 
-         new_state == EXECUTE ||
-         new_state == REVERSE_EXECUTE;
+         new_state == EXECUTE;
 }
 /****************************************************************************/
 
@@ -488,6 +476,7 @@ void StateExecute::run_loop(){
   }
 }
 
+
 template<>
 void StateExecute::go_button(){
   //Treat "go" as emergency stop.
@@ -502,8 +491,14 @@ void StateExecute::end_stop(){
 }
 
 template<>
+void StateReverseExecute::home_stop(){
+  //All done, even if we didn't quite hit our targets
+  back_off_stop(HOME_STOP);
+  m_machine->change_state(STATES::WAIT);
+}
+
+template<>
 void StateExecute::enter_state(){
-  REPEAT_TOGGLE=STATES::REVERSE_EXECUTE; //Next time, reverse excute if we go again.
   long secs = calculate_travel_time();
   if (0.0 == secs) {
     //Okay to use 0 comparison in float; we set this as an error condition
@@ -515,108 +510,37 @@ void StateExecute::enter_state(){
     //should move.
     //slider steps per second
     float slider_sps = SLIDE_TARGET_STOP / secs;
+    slider_sps *= NEXT_DIRECTION;
     //camera pan steps per second
     float camera_sps = (CAMERA_TARGET_STOP - CAMERA_TARGET_START) / secs;
-    SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
+    camera_sps *= NEXT_DIRECTION;
+    if(ENDWARD == NEXT_DIRECTION){
+      SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
+      CAMERA_MOTOR.moveTo(CAMERA_TARGET_STOP);
+    }
+    else {
+      SLIDER_MOTOR.moveTo(0);
+      CAMERA_MOTOR.moveTo(CAMERA_TARGET_START);
+    }
     SLIDER_MOTOR.setSpeed(slider_sps);
-    CAMERA_MOTOR.moveTo(CAMERA_TARGET_STOP);
     CAMERA_MOTOR.setSpeed(camera_sps);
-    #ifdef DEBUG_OUTPUT
-      Serial.print("secs: ");
-      Serial.println(secs);
-      Serial.print("slider speed: ");
-      Serial.println(slider_sps);
-      Serial.print("camera speed: ");
-      Serial.println(camera_sps);
-      Serial.print("camera position: ");
-      Serial.println(CAMERA_MOTOR.currentPosition());
-      Serial.print("camera start: ");
-      Serial.println(CAMERA_TARGET_START);
-      Serial.print("camera end: ");
-      Serial.println(CAMERA_TARGET_STOP);
-    #endif //DEBUG_OUTPUT
+    DEBUG(F("secs: "),secs);
+    DEBUG(F("slider speed: "),slider_sps);
+    DEBUG(F("camera speed: "),camera_sps);
+    DEBUG(F("camera cur pos: "),CAMERA_MOTOR.currentPosition());
+    DEBUG(F("camera target: "),CAMERA_MOTOR.targetPosition());
+    DEBUG(F("slider cur pos: "),SLIDER_MOTOR.currentPosition());
+    DEBUG(F("slider target: "),SLIDER_MOTOR.targetPosition());
   }
 }
 
 template<>
 void StateExecute::exit_state(){
-  NEXT_DIRECTION = HOMEWARD;
+  NEXT_DIRECTION*= -1; //Reverse direction when we hit the other side
 }
 
 template<>
 bool StateExecute::transition_allowed(STATES new_state){
-  return STATES::WAIT == new_state;
-};
-/****************************************************************************/
-
-/*** ReverseExecute state ***************************************************/
-template<>
-void StateReverseExecute::run_loop(){
-  SLIDER_MOTOR.runSpeedToPosition();
-  CAMERA_MOTOR.runSpeedToPosition();
-  if (0 == SLIDER_MOTOR.distanceToGo() &&
-      0 == CAMERA_MOTOR.distanceToGo()){
-    m_machine->change_state(STATES::WAIT); //All done!
-  }
-}
-
-template<>
-void StateReverseExecute::go_button(){
-  //Treat "go" as emergency stop.
-  setCancel();
-}
-
-template<>
-void StateReverseExecute::home_stop(){
-  //All done, even if we didn't quite hit our targets
-    back_off_stop(HOME_STOP);
-  m_machine->change_state(STATES::WAIT);
-}
-
-template<>
-void StateReverseExecute::enter_state(){
-  REPEAT_TOGGLE=STATES::EXECUTE;//next time, execute if we repeat
-  long secs = calculate_travel_time();
-  if (0.0 == secs) {
-    //Okay to use 0 comparison in float; we set this as an error condition
-    //rather than calculating it.
-    setSoftwareError();
-  }
-  else {
-    //Now that we know how long it should take, we can figure out how fast we
-    //should move.
-    //slider steps per second, negative this time because we are going back
-    float slider_sps = -SLIDE_TARGET_STOP / secs;
-    //camera pan steps per second (reversed because we are going back)
-    float camera_sps = (CAMERA_TARGET_START - CAMERA_TARGET_STOP) / secs;
-    SLIDER_MOTOR.moveTo(0);
-    SLIDER_MOTOR.setSpeed(slider_sps);
-    CAMERA_MOTOR.moveTo(CAMERA_TARGET_START);
-    CAMERA_MOTOR.setSpeed(camera_sps);
-    #ifdef DEBUG_OUTPUT
-      Serial.print("secs: ");
-      Serial.println(secs);
-      Serial.print("slider speed: ");
-      Serial.println(slider_sps);
-      Serial.print("camera speed: ");
-      Serial.println(camera_sps);
-      Serial.print("camera position: ");
-      Serial.println(CAMERA_MOTOR.currentPosition());
-      Serial.print("camera start: ");
-      Serial.println(CAMERA_TARGET_START);
-      Serial.print("camera end: ");
-      Serial.println(CAMERA_TARGET_STOP);
-    #endif //DEBUG_OUTPUT
-  }
-}
-
-template<>
-void StateReverseExecute::exit_state(){
-  NEXT_DIRECTION = ENDWARD;
-}
-
-template<>
-bool StateReverseExecute::transition_allowed(STATES new_state){
   return STATES::WAIT == new_state;
 };
 /****************************************************************************/
@@ -675,12 +599,15 @@ void loop() {
   state_machine.run_loop();
   //if our button has changed, and is high
   if (GO_BUTTON.update() && !GO_BUTTON.read()) {
+    DEBUG(F("Go button pressed"));
     state_machine.go_button();
   }
   if (HOME_STOP.update() && !HOME_STOP.read()) {
+    DEBUG(F("Home stop hit"));
     state_machine.home_stop();
   }
   if (END_STOP.update() && !END_STOP.read()) {
+    DEBUG(F("End stop hit"));
     state_machine.end_stop();
   }
 }
@@ -689,11 +616,12 @@ void setup() {
 //turn the light on while we boot (even though it will probably be off
 //before humans can see it.)
 pinMode(ERROR_LED_PIN, OUTPUT);
+digitalWrite(ERROR_LED_PIN, HIGH);
 
 #ifdef DEBUG_OUTPUT
   Serial.begin(9600);
 #endif
-digitalWrite(ERROR_LED_PIN, HIGH);
+DEBUG(F("Starting up"));
 
 //AccelStepper will set pins as output for us
 SLIDER_MOTOR.setMaxSpeed(SLIDER_MAX_SPEED);
