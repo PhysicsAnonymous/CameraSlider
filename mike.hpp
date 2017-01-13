@@ -79,7 +79,7 @@ class AbstractState {
     virtual void enter_state();
 
     //Just returns the enum associated with the current state
-    virtual STATES get_state_as_enum();
+    virtual STATES get_state_as_enum()=0;
 
     void* operator new(size_t sz);
 
