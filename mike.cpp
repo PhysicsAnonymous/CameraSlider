@@ -21,6 +21,10 @@ Bounce END_STOP;
 
 bool HAVE_HOMED=false;
 
+const int ENDWARD =        (SLIDER_MAX_POSITION/abs(SLIDER_MAX_POSITION));
+const int HOMEWARD =       ENDWARD * -1;
+const long BACK_OFF_STEP = abs((SLIDER_MAX_POSITION)/1000);
+
 int NEXT_DIRECTION=ENDWARD;
 /****************************************************************************/
 
@@ -516,6 +520,7 @@ void StateExecute::enter_state(){
     }
     SLIDER_MOTOR.setSpeed(slider_sps);
     CAMERA_MOTOR.setSpeed(camera_sps);
+    DEBUG(F("NEXT_DIRECTION: "),NEXT_DIRECTION);
     DEBUG(F("secs: "),secs);
     DEBUG(F("slider speed: "),slider_sps);
     DEBUG(F("camera speed: "),camera_sps);

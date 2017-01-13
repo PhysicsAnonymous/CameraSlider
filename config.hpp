@@ -7,13 +7,11 @@
 #define SLIDER_STEP_PIN 2 //D2
 #define SLIDER_DIR_PIN 3 //D3
 //In Steps/secon
-#define SLIDER_MAX_ACCEL 4000.0
+#define SLIDER_MAX_ACCEL 3000.0
 #define SLIDER_MAX_SPEED 8000.0
 //Max possible position is 2,147,483,647.  
 //Can be a function like steps/inch * inches
-#define SLIDER_MAX_POSITION -400 * 32//-860 * 32
-//How many steps to try at a time while backing off
-#define BACK_OFF_STEP SLIDER_MAX_POSITION/1000;
+#define SLIDER_MAX_POSITION -900//(-400 * 32)//-860 * 32
 #define MAX_HOMING_SPEED 1000
 /****************************************************************************/
 
@@ -21,7 +19,7 @@
 #define CAMERA_STEP_PIN 4 //D4
 #define CAMERA_DIR_PIN 5 //D5
 #define CAMERA_MAX_ACCEL 4000.0
-#define CAMERA_MAX_SPEED 2000.0
+#define CAMERA_MAX_SPEED 3000.0
 //Max possible position is 2,147,483,647
 //Should probably be 1/4 steps required for a camera revolution
 #define CAMERA_MAX_POSITION 1000
@@ -31,11 +29,11 @@
 
 /*** Timing constants *******************************************************/
 //Time in seconds to traverse the length of the slider in both modes
-#define VIDEO_TRAVERSAL_TIME_MIN 4
-#define VIDEO_TRAVERSAL_TIME_MAX 15 //30
+#define VIDEO_TRAVERSAL_TIME_MIN 10
+#define VIDEO_TRAVERSAL_TIME_MAX 60
 
-#define LAPSE_TRAVERSAL_TIME_MIN 20//30
-#define LAPSE_TRAVERSAL_TIME_MAX 60//60 * 60 * 1 //60 seconds * 60 minutes *1 hour
+#define LAPSE_TRAVERSAL_TIME_MIN 60
+#define LAPSE_TRAVERSAL_TIME_MAX 600
 /****************************************************************************/
 
 /*** Button constants *******************************************************/

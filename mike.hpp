@@ -6,8 +6,8 @@
 //We need size_t defined locally for some reason
 typedef unsigned int size_t;
 
-#define ENDWARD SLIDER_MAX_POSITION / SLIDER_MAX_POSITION
-#define HOMEWARD ENDWARD * -1
+//#define ENDWARD SLIDER_MAX_POSITION / SLIDER_MAX_POSITION
+//#define HOMEWARD ENDWARD * -1
 
 /****************************************************************************/
 enum STATES {
