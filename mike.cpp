@@ -137,6 +137,21 @@ void back_off_stop(Bounce &stop){
   digitalWrite(ERROR_LED_PIN, LOW);
 }
 
+void get_accels(float slider_sps, float camera_sps, float slider_accel, float camera_accel){
+   float slider_accel_time = slider_sps / SLIDER_MAX_ACCEL;
+   float camera_accel_time = camera_sps / CAMERA_MAX_ACCEL;
+   //whichever takes the longest, that is what we must scale to
+   if (slider_accel_time >= camera_accel_time){
+     camera_accel = camera_sps/slider_accel_time;
+     slider_accel = SLIDER_MAX_ACCEL;
+   }
+   else { //just the opposite calculation:
+     slider_accel = slider_sps/camera_accel_time;
+     camera_accel = CAMERA_MAX_ACCEL;
+  }
+}
+
+
 /****************************************************************************/
 
 /*** AbstractState **********************************************************/
@@ -474,8 +489,8 @@ void StateSecondHome::go_button(){
 /*** Execute state **********************************************************/
 template<>
 void StateExecute::run_loop(){
-  SLIDER_MOTOR.runSpeedToPosition();
-  CAMERA_MOTOR.runSpeedToPosition();
+  SLIDER_MOTOR.run();
+  CAMERA_MOTOR.run();
   if (0 == SLIDER_MOTOR.distanceToGo() &&
       0 == CAMERA_MOTOR.distanceToGo()){
     m_machine->change_state(STATES::WAIT); //All done!
@@ -529,13 +544,20 @@ void StateExecute::enter_state(){
       SLIDER_MOTOR.moveTo(0);
       CAMERA_MOTOR.moveTo(CAMERA_TARGET_START);
     }
-    //speeds must be set *after* moveTo's
-    SLIDER_MOTOR.setSpeed(slider_sps);
-    CAMERA_MOTOR.setSpeed(camera_sps);
+    float slider_accel=0;
+    float camera_accel=0;
+    get_accels(slider_sps, camera_sps, slider_accel, camera_accel);
+    SLIDER_MOTOR.setAcceleration(slider_accel);
+    SLIDER_MOTOR.setMaxSpeed(slider_sps);
+    CAMERA_MOTOR.setAcceleration(camera_accel);
+    CAMERA_MOTOR.setMaxSpeed(camera_sps);
+
     DEBUG(F("NEXT_DIRECTION: "),NEXT_DIRECTION);
     DEBUG(F("secs: "),secs);
     DEBUG(F("slider speed: "),slider_sps);
     DEBUG(F("camera speed: "),camera_sps);
+    DEBUG(F("slider accel: "),slider_accel);
+    DEBUG(F("camera accel: "),camera_accel);
     DEBUG(F("camera cur pos: "),CAMERA_MOTOR.currentPosition());
     DEBUG(F("camera target: "),CAMERA_MOTOR.targetPosition());
     DEBUG(F("slider cur pos: "),SLIDER_MOTOR.currentPosition());
@@ -546,6 +568,11 @@ void StateExecute::enter_state(){
 template<>
 void StateExecute::exit_state(){
   NEXT_DIRECTION*= -1; //Reverse direction when we hit the other side
+  //return motors to normal speeds
+  SLIDER_MOTOR.setAcceleration(SLIDER_MAX_ACCEL);
+  SLIDER_MOTOR.setMaxSpeed(SLIDER_MAX_SPEED);
+  CAMERA_MOTOR.setAcceleration(CAMERA_MAX_ACCEL);
+  CAMERA_MOTOR.setMaxSpeed(CAMERA_MAX_SPEED);
 }
 
 template<>
