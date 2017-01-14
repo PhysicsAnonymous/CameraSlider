@@ -13,7 +13,9 @@ long CAMERA_TARGET_START=0;
 long CAMERA_TARGET_STOP=0;
 long SLIDE_TARGET_STOP=SLIDER_MAX_POSITION;
 ERROR_T ERR=ERROR_T::NONE;
-char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::ADJUST>)]; //Largest "state"
+//if any child state is larger, use it as the size of our reserve.  If they
+//are all the same, just pick one.
+char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::ADJUST>)];
 
 Bounce GO_BUTTON;
 Bounce HOME_STOP;
@@ -68,7 +70,7 @@ SWITCH_STATE read_3way(){
 long read_camera_pot(){
   long pos_raw = analogRead(CAMERA_POT_PIN);
   #ifdef REVERSE_CAMERA_POT
-  pos_raw = 1023 - pos_raw;
+    pos_raw = 1023 - pos_raw;
   #endif // REVERSE_CAMERA_POT
   //DEBUG(F("raw camera pot: "),pos_raw);
   //make sure there was a real change, so we aren't going back and forth
@@ -275,7 +277,7 @@ void StateWait::go_button(){
       m_machine->change_state(STATES::EXECUTE);
     }
     else { //not in program mode, and have no targets/home set
-      setUnknownError(); // Not really an error, just blink to let user 
+      setUnknownError(); // Not really an error, just blink to let user
                          //know we are not in the right mode! (program mode)
     }
   }
@@ -283,7 +285,7 @@ void StateWait::go_button(){
 
 template<>
 bool StateWait::transition_allowed(STATES new_state){
-  return new_state == FIRST_HOME || 
+  return new_state == FIRST_HOME ||
          new_state == EXECUTE;
 }
 /****************************************************************************/
@@ -516,7 +518,8 @@ void StateExecute::enter_state(){
     float slider_sps = (float)SLIDE_TARGET_STOP / secs;
     slider_sps *= (float)NEXT_DIRECTION;
     //camera pan steps per second
-    float camera_sps = ((float)CAMERA_TARGET_STOP - (float)CAMERA_TARGET_START) / secs;
+    float camera_sps = ((float)CAMERA_TARGET_STOP -
+      (float)CAMERA_TARGET_START) / secs;
     camera_sps *= (float)NEXT_DIRECTION;
     if(ENDWARD == NEXT_DIRECTION){
       SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
@@ -670,4 +673,3 @@ digitalWrite(ERROR_LED_PIN, LOW);
 }
 
 /****************************************************************************/
-
