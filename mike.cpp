@@ -110,23 +110,27 @@ float calculate_travel_time(){
 
 //initial guess is how far past the stop we *think* we went.  Guess 10 if
 //we are clueless.
-void back_off_stop(Bounce &stop, const long initial_guess = 10){
+void back_off_stop(Bounce &stop){
+  const long FIRST_BACK_OFF_STEPS = 50;
+  const long BACK_OFF_STEPS = 10;
+  //First, make sure we stop!
+  SLIDER_MOTOR.setSpeed(0);
+  //Now let's find some directions
   long direction = ENDWARD;
   if(&END_STOP == &stop){
     direction = HOMEWARD;
   }
   digitalWrite(ERROR_LED_PIN, HIGH);
-  long distance= initial_guess * direction; //Arbitrary number of steps
+  long distance= FIRST_BACK_OFF_STEPS * direction; //Arbitrary number of steps
   stop.update();
   while (!stop.read()){
-    SLIDER_MOTOR.move(distance);
     DEBUG(F("backing off stop (steps): "),distance);
-    while(0 != SLIDER_MOTOR.distanceToGo()){
-      SLIDER_MOTOR.run();
-    }
+    SLIDER_MOTOR.move(distance); //relative move
+    SLIDER_MOTOR.runToPosition();
     //wait to ensure there's no button bounce
-    delay(min(DEBOUNCE_INTERVAL/100,1));
+    delay(1);
     stop.update();
+    distance= BACK_OFF_STEPS * direction;
   }
   digitalWrite(ERROR_LED_PIN, LOW);
 }
@@ -318,10 +322,7 @@ void StateFirstHome::exit_state(){
 
 template<>
 void StateFirstHome::home_stop(){
-  SLIDER_MOTOR.stop();
-  long overshoot = SLIDER_MOTOR.distanceToGo();
-  SLIDER_MOTOR.runToPosition(); //impliment the stop.
-  back_off_stop(HOME_STOP,overshoot);
+  back_off_stop(HOME_STOP);
   SLIDER_MOTOR.setCurrentPosition(0);
   HAVE_HOMED=true;
   m_machine->change_state(STATES::ADJUST);
@@ -502,7 +503,7 @@ void StateReverseExecute::home_stop(){
 
 template<>
 void StateExecute::enter_state(){
-  long secs = calculate_travel_time();
+  float secs = calculate_travel_time();
   if (0.0 == secs) {
     //Okay to use 0 comparison in float; we set this as an error condition
     //rather than calculating it.
@@ -512,11 +513,11 @@ void StateExecute::enter_state(){
     //Now that we know how long it should take, we can figure out how fast we
     //should move.
     //slider steps per second
-    float slider_sps = SLIDE_TARGET_STOP / secs;
-    slider_sps *= NEXT_DIRECTION;
+    float slider_sps = (float)SLIDE_TARGET_STOP / secs;
+    slider_sps *= (float)NEXT_DIRECTION;
     //camera pan steps per second
-    float camera_sps = (CAMERA_TARGET_STOP - CAMERA_TARGET_START) / secs;
-    camera_sps *= NEXT_DIRECTION;
+    float camera_sps = ((float)CAMERA_TARGET_STOP - (float)CAMERA_TARGET_START) / secs;
+    camera_sps *= (float)NEXT_DIRECTION;
     if(ENDWARD == NEXT_DIRECTION){
       SLIDER_MOTOR.moveTo(SLIDE_TARGET_STOP);
       CAMERA_MOTOR.moveTo(CAMERA_TARGET_STOP);
@@ -525,6 +526,7 @@ void StateExecute::enter_state(){
       SLIDER_MOTOR.moveTo(0);
       CAMERA_MOTOR.moveTo(CAMERA_TARGET_START);
     }
+    //speeds must be set *after* moveTo's
     SLIDER_MOTOR.setSpeed(slider_sps);
     CAMERA_MOTOR.setSpeed(camera_sps);
     DEBUG(F("NEXT_DIRECTION: "),NEXT_DIRECTION);
@@ -581,6 +583,8 @@ void StateError::run_loop(){
   }
   #endif
   //if we haven't defined an error pin, just leave this mode.
+  //Since we don't know what happened, better to assume we haven't even homed
+  HAVE_HOMED=false;
   ERR=ERROR_T::NONE;
   m_machine->change_state(STATES::WAIT);
 }

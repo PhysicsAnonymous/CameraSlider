@@ -12,7 +12,7 @@
 //Max possible position is 2,147,483,647.  
 //Can be a function like steps/inch * inches
 #define SLIDER_MAX_POSITION (-400 * 32)//-900 * 32
-#define MAX_HOMING_SPEED 1000
+#define MAX_HOMING_SPEED 500
 /****************************************************************************/
 
 /*** Camera constants *******************************************************/
