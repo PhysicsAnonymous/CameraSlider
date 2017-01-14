@@ -43,7 +43,7 @@ void DEBUG(const M msg, const T value){
 template<class T>
 void DEBUG(const T msg){
   #ifdef DEBUG_OUTPUT
-    Serial.print(msg);
+    Serial.println(msg);
   #endif
 }
 
@@ -137,16 +137,16 @@ void back_off_stop(Bounce &stop){
   digitalWrite(ERROR_LED_PIN, LOW);
 }
 
-void get_accels(float slider_sps, float camera_sps, float slider_accel, float camera_accel){
-   float slider_accel_time = slider_sps / SLIDER_MAX_ACCEL;
-   float camera_accel_time = camera_sps / CAMERA_MAX_ACCEL;
+void get_accels(float slider_sps, float camera_sps, float &slider_accel, float &camera_accel){
+   float slider_accel_time = abs(slider_sps / SLIDER_MAX_ACCEL);
+   float camera_accel_time = abs(camera_sps / CAMERA_MAX_ACCEL);
    //whichever takes the longest, that is what we must scale to
    if (slider_accel_time >= camera_accel_time){
-     camera_accel = camera_sps/slider_accel_time;
+     camera_accel = abs(camera_sps/slider_accel_time);
      slider_accel = SLIDER_MAX_ACCEL;
    }
    else { //just the opposite calculation:
-     slider_accel = slider_sps/camera_accel_time;
+     slider_accel = abs(slider_sps/camera_accel_time);
      camera_accel = CAMERA_MAX_ACCEL;
   }
 }
@@ -167,29 +167,23 @@ void AbstractState::operator delete(void* p){
 //These could be templates too, but typing the function name is easier than
 //typing the template.
 void AbstractState::setSoftwareError(){
+  DEBUG(F("Software Error"));
   ERR=ERROR_T::SOFTWARE;
   m_machine->change_state(STATES::ERROR);
 }
 
 void AbstractState::setUnknownError(){
+  DEBUG(F("Unknown Error"));
   ERR=ERROR_T::UNKNOWN;
   m_machine->change_state(STATES::ERROR);
 }
 
 void AbstractState::setCancel(){
+  DEBUG(F("Cancel"));
   ERR=ERROR_T::CANCEL;
   m_machine->change_state(STATES::ERROR);
 }
 
-void AbstractState::transitionOrError(const int direction, const STATES state){
-  if (direction == NEXT_DIRECTION){
-    m_machine->change_state(state);
-  }
-  else {
-    //it's a software error to have gone the wrong way.
-    setSoftwareError();
-  }
-}
 /****************************************************************************/
 
 
@@ -548,9 +542,9 @@ void StateExecute::enter_state(){
     float camera_accel=0;
     get_accels(slider_sps, camera_sps, slider_accel, camera_accel);
     SLIDER_MOTOR.setAcceleration(slider_accel);
-    SLIDER_MOTOR.setMaxSpeed(slider_sps);
+    SLIDER_MOTOR.setMaxSpeed(abs(slider_sps));
     CAMERA_MOTOR.setAcceleration(camera_accel);
-    CAMERA_MOTOR.setMaxSpeed(camera_sps);
+    CAMERA_MOTOR.setMaxSpeed(abs(camera_sps));
 
     DEBUG(F("NEXT_DIRECTION: "),NEXT_DIRECTION);
     DEBUG(F("secs: "),secs);
