@@ -14,6 +14,9 @@
 /*** Global externs **********************************************************
   Globals are defined in main.cpp to keep them in one place, but we use
   several of them here.
+
+  //TODO: consider movign all of this to a hardware class, because
+  OOP/encapsulation/blahblahblah.
 *****************************************************************************/
 extern AccelStepper SLIDER_MOTOR;
 extern AccelStepper CAMERA_MOTOR;
@@ -26,7 +29,15 @@ extern Bounce HOME_STOP;
 extern Bounce END_STOP;
 extern int NEXT_DIRECTION;
 extern bool HAVE_HOMED;
-extern char STATIC_MEMORY_ALLOCATION[];
+
+//We dynamically allocate a new state on each state transition.  This would
+//require us to introduce complex memory management, such as a heap, on the
+//arduino - except that we only ever need one state at a time.  So instead
+//we'll just reserve a slice of memory that is as large as our largest state,
+//and use that for all state instantiations.
+//if any child state is larger, use it as the size of our reserve.  If they
+//are all the same, just pick one.
+char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::ADJUST>)];
 /****************************************************************************/
 
 /*** Utility functions ******************************************************/
@@ -405,7 +416,7 @@ void StateExecute::end_stop(){
 }
 
 template<>
-void StateReverseExecute::home_stop(){
+void StateExecute::home_stop(){
   //All done, even if we didn't quite hit our targets
   back_off_stop(HOME_STOP);
   m_machine->change_state(STATES::WAIT);
@@ -523,12 +534,3 @@ bool StateError::transition_allowed(STATES new_state){
   return STATES::WAIT == new_state;
 };
 /****************************************************************************/
-
-//We dynamically allocate a new state on each state transition.  This would
-//require us to introduce complex memory management, such as a heap, on the
-//arduino - except that we only ever need one state at a time.  So instead
-//we'll just reserve a slice of memory that is as large as our largest state,
-//and use that for all state instantiations.
-//if any child state is larger, use it as the size of our reserve.  If they
-//are all the same, just pick one.
-char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::ADJUST>)];
