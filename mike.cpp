@@ -1,8 +1,12 @@
+/*****************************************************************************
+== Physics Anonymous CC-BY 2017 ==
+******************************************************************************/
 
+#include <Bounce2.h>
+#include <MultiStepper.h>
+#include <AccelStepper.h>
 #include <Arduino.h>
 #include <limits.h>
-#include "AccelStepper/AccelStepper.cpp"
-#include "Bounce2-master/Bounce2.cpp"
 #include "mike.hpp"
 
 /*** Global data ************************************************************/

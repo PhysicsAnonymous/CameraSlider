@@ -1,18 +1,16 @@
+/*****************************************************************************
+== Physics Anonymous CC-BY 2017 ==
+******************************************************************************/
+
 #ifndef MIKE_H
 #define MIKE_H
 
 #include "config.hpp"
 
-//We need size_t defined locally for some reason
-typedef unsigned int size_t;
-
-//#define ENDWARD SLIDER_MAX_POSITION / SLIDER_MAX_POSITION
-//#define HOMEWARD ENDWARD * -1
-
 /****************************************************************************/
 enum STATES {
   NO_STATE=0,
-  FIRST_HOME, 
+  FIRST_HOME,
   ADJUST,
   FIRST_END_MOVE,
   SECOND_HOME,
@@ -85,7 +83,7 @@ class AbstractState {
     void transitionOrError(const int direction, const STATES state);
 
     AbstractState(SliderFSM* machine) : m_machine(machine){};
-    SliderFSM* m_machine; 
+    SliderFSM* m_machine;
 
 };
 
