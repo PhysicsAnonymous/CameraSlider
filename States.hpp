@@ -2,41 +2,8 @@
 == Physics Anonymous CC-BY 2017 ==
 ******************************************************************************/
 
-#ifndef MIKE_H
-#define MIKE_H
-
-#include "config.hpp"
-
-/****************************************************************************/
-enum STATES {
-  NO_STATE=0,
-  FIRST_HOME,
-  ADJUST,
-  FIRST_END_MOVE,
-  SECOND_HOME,
-  WAIT,
-  EXECUTE,
-  ERROR,
-  REVERSE_EXECUTE
-};
-
-enum SWITCH_STATE{
-  VIDEO_MODE,
-  LAPSE_MODE,
-  PROGRAM_MODE,
-  INVALID
-};
-
-enum ERROR_T{
-  NONE=0,
-  UNKNOWN,
-  CANCEL,
-  SOFTWARE
-};
-/****************************************************************************/
-
-class SliderFSM;
-/****************************************************************************/
+#ifndef STATES_H
+#define STATES_H
 
 /****************************************************************************/
 // This class is the abstract base class inherited by our states
@@ -129,22 +96,5 @@ typedef ConcreteState<STATES::ERROR> StateError;
 typedef ConcreteState<STATES::REVERSE_EXECUTE> StateReverseExecute;
 
 /****************************************************************************/
-
-/*** SliderFSM **************************************************************/
-class SliderFSM {
-  public:
-    SliderFSM();
-    void run_loop();
-    void go_button();
-    void home_stop();
-    void end_stop();
-    void change_state(STATES new_state);
-  private:
-    AbstractState* m_state;
-    STATES m_target_state;
-    void update_state();
-};
-/****************************************************************************/
-
 
 #endif

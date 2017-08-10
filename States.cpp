@@ -2,54 +2,34 @@
 == Physics Anonymous CC-BY 2017 ==
 ******************************************************************************/
 
-#include <Bounce2.h>
-#include <MultiStepper.h>
-#include <AccelStepper.h>
 #include <Arduino.h>
 #include <limits.h>
-#include "mike.hpp"
+#include <Bounce2.h>
+#include <AccelStepper.h>
+#include "config.hpp"
+#include "global.hpp"
+#include "SliderFSM.hpp"
+#include "States.hpp"
 
-/*** Global data ************************************************************/
-AccelStepper SLIDER_MOTOR(AccelStepper::DRIVER, SLIDER_STEP_PIN, SLIDER_DIR_PIN);
-AccelStepper CAMERA_MOTOR(AccelStepper::DRIVER, CAMERA_STEP_PIN, CAMERA_DIR_PIN);
-SliderFSM state_machine;
-long CAMERA_TARGET_START=0;
-long CAMERA_TARGET_STOP=0;
-long SLIDE_TARGET_STOP=SLIDER_MAX_POSITION;
-ERROR_T ERR=ERROR_T::NONE;
-//if any child state is larger, use it as the size of our reserve.  If they
-//are all the same, just pick one.
-char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::ADJUST>)];
-
-Bounce GO_BUTTON;
-Bounce HOME_STOP;
-Bounce END_STOP;
-
-bool HAVE_HOMED=false;
-
-const int ENDWARD =        (SLIDER_MAX_POSITION/abs(SLIDER_MAX_POSITION));
-const int HOMEWARD =       ENDWARD * -1;
-const long BACK_OFF_STEP = abs((SLIDER_MAX_POSITION)/1000);
-
-int NEXT_DIRECTION=ENDWARD;
+/*** Global externs **********************************************************
+  Globals are defined in main.cpp to keep them in one place, but we use
+  several of them here.
+*****************************************************************************/
+extern AccelStepper SLIDER_MOTOR;
+extern AccelStepper CAMERA_MOTOR;
+extern long CAMERA_TARGET_START;
+extern long CAMERA_TARGET_STOP;
+extern long SLIDE_TARGET_STOP;
+extern ERROR_T ERR;
+extern Bounce GO_BUTTON;
+extern Bounce HOME_STOP;
+extern Bounce END_STOP;
+extern int NEXT_DIRECTION;
+extern bool HAVE_HOMED;
+extern char STATIC_MEMORY_ALLOCATION[];
 /****************************************************************************/
 
 /*** Utility functions ******************************************************/
-
-template<class M, class T>
-void DEBUG(const M msg, const T value){
-  #ifdef DEBUG_OUTPUT
-    Serial.print(msg);
-    Serial.println(value);
-  #endif
-}
-
-template<class T>
-void DEBUG(const T msg){
-  #ifdef DEBUG_OUTPUT
-    Serial.println(msg);
-  #endif
-}
 
 long de_jitter(const long value){
   static int previous = 0;
@@ -188,91 +168,6 @@ void AbstractState::setCancel(){
   m_machine->change_state(STATES::ERROR);
 }
 
-/****************************************************************************/
-
-
-/*** SliderFSM **************************************************************/
-void SliderFSM::run_loop(){
-  //If we have a request to change state, handle that; otherwise run
-  if(STATES::NO_STATE == m_target_state){m_state->run_loop();}
-  else{update_state();}
-}
-
-void SliderFSM::go_button(){m_state->go_button();}
-
-void SliderFSM::home_stop(){m_state->home_stop();}
-
-void SliderFSM::end_stop(){m_state->end_stop();}
-
-void SliderFSM::change_state(STATES new_state){
-  if (STATES::NO_STATE != m_target_state) {
-    /*TODO: complain about rapid state changes - should never happen*/
-   }
-  //Don't update to the same state!
-  else if (m_target_state != m_state->get_state_as_enum()) {
-    m_target_state = new_state;
-  }
-  else {
-    ERR=ERROR_T::SOFTWARE;
-    m_target_state = STATES::ERROR;
-  }
-}
-
-void SliderFSM::update_state(){
-  //TODO: Technically, we should probably block interrupts here, because
-  //while we are in this function we are in an undefined state.  But we aren't
-  //using interrupts.
-
-  //if the transition is not allowed, it's a software error
-  if (! m_state->transition_allowed(m_target_state)) {
-    ERR=ERROR_T::SOFTWARE;
-    m_target_state=STATES::ERROR;
-  }
-  m_state->exit_state(); //exit our current state before entering new one
-  delete m_state;
-  switch (m_target_state) {
-    case FIRST_HOME:
-      DEBUG(F("State: First Home"));
-      m_state = new StateFirstHome(this);
-      break;
-    case ADJUST:
-      DEBUG(F("State: Adjust"));
-      m_state = new StateAdjust(this);
-      break;
-    case FIRST_END_MOVE:
-      DEBUG(F("State: FirstEndMove"));
-      m_state = new StateFirstEndMove(this);
-      break;
-    case SECOND_HOME:
-      DEBUG(F("State: SecondHome"));
-      m_state = new StateSecondHome(this);
-      break;
-    case WAIT:
-      DEBUG(F("State: Wait"));
-      m_state = new StateWait(this);
-      break;
-    case EXECUTE:
-      DEBUG(F("State: Execute"));
-      m_state = new StateExecute(this);
-      break;
-    case ERROR:
-      DEBUG(F("State: Error"));
-      m_state = new StateError(this);
-      break;
-    default:
-      DEBUG(F("Invalid State selected"),m_target_state);
-      ERR=ERROR_T::SOFTWARE;
-      m_state = new StateError(this);
-  }
-  m_target_state=STATES::NO_STATE;
-  m_state->enter_state();
-}
-
-SliderFSM::SliderFSM() {
-  m_state = new StateWait(this);
-  m_state->enter_state();
-  m_target_state = STATES::NO_STATE;
-}
 /****************************************************************************/
 
 /*** Wait state *************************************************************/
@@ -629,72 +524,11 @@ bool StateError::transition_allowed(STATES new_state){
 };
 /****************************************************************************/
 
-
-/*** Main *******************************************************************/
-void loop() {
-  static int counter = 0;
-  #define COUNTER_MAX 9
-  #define COUNTER_STEP COUNTER_MAX / 3
-  state_machine.run_loop();
-  if(COUNTER_STEP == counter){
-    //if our button has changed, and is high
-    if (GO_BUTTON.update() && !GO_BUTTON.read()) {
-      DEBUG(F("Go button pressed"));
-      state_machine.go_button();
-    }
-  }
-  if(COUNTER_STEP * 2 == counter){
-    if (HOME_STOP.update() && !HOME_STOP.read()) {
-      DEBUG(F("Home stop hit"));
-      state_machine.home_stop();
-    }
-  }
-  if(0 == counter){
-    if (END_STOP.update() && !END_STOP.read()) {
-      DEBUG(F("End stop hit"));
-      state_machine.end_stop();
-    }
-    counter = COUNTER_MAX; //loops until button check
-  }
-  counter--;
-  #undef COUNTER_MAX
-  #undef COUNTER_STEP
-}
-
-void setup() {
-//turn the light on while we boot (even though it will probably be off
-//before humans can see it.)
-pinMode(ERROR_LED_PIN, OUTPUT);
-digitalWrite(ERROR_LED_PIN, HIGH);
-
-#ifdef DEBUG_OUTPUT
-  Serial.begin(9600);
-#endif
-DEBUG(F("Starting up"));
-
-//AccelStepper will set pins as output for us
-SLIDER_MOTOR.setMaxSpeed(SLIDER_MAX_SPEED);
-SLIDER_MOTOR.setAcceleration(SLIDER_MAX_ACCEL);
-CAMERA_MOTOR.setMaxSpeed(CAMERA_MAX_SPEED);
-CAMERA_MOTOR.setAcceleration(CAMERA_MAX_ACCEL);
-
-pinMode(GO_PIN, INPUT_PULLUP);
-pinMode(HOME_STOP_PIN, INPUT_PULLUP);
-pinMode(END_STOP_PIN, INPUT_PULLUP);
-pinMode(VIDEO_MODE_PIN, INPUT_PULLUP);
-pinMode(LAPSE_MODE_PIN, INPUT_PULLUP);
-GO_BUTTON.attach(GO_PIN);
-HOME_STOP.attach(HOME_STOP_PIN);
-END_STOP.attach(END_STOP_PIN);
-//debounce interval in ms
-GO_BUTTON.interval(DEBOUNCE_INTERVAL);
-HOME_STOP.interval(DEBOUNCE_INTERVAL);
-END_STOP.interval(DEBOUNCE_INTERVAL);
-
-pinMode(SPEED_POT_PIN, INPUT);
-pinMode(CAMERA_POT_PIN, INPUT);
-
-digitalWrite(ERROR_LED_PIN, LOW);
-}
-
-/****************************************************************************/
+//We dynamically allocate a new state on each state transition.  This would
+//require us to introduce complex memory management, such as a heap, on the
+//arduino - except that we only ever need one state at a time.  So instead
+//we'll just reserve a slice of memory that is as large as our largest state,
+//and use that for all state instantiations.
+//if any child state is larger, use it as the size of our reserve.  If they
+//are all the same, just pick one.
+char STATIC_MEMORY_ALLOCATION[sizeof(ConcreteState<STATES::ADJUST>)];
